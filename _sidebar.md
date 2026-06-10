@@ -1,6 +1,5 @@
 - [🏠 首页](/)
 - **Phase 0: 预备周**
-  - [Week 0 环境搭建](docs/week0/day1.md)
   - [Day 1 工具链搭建](docs/week0/day1.md)
   - [Day 2 AI 助手上手](docs/week0/day2.md)
   - [Day 3 项目初始化](docs/week0/day3.md)

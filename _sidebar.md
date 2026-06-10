@@ -1,6 +1,6 @@
 - [🏠 首页](/)
 - **Phase 0: 预备周**
-  - [Week 0 环境搭建](docs/week0/day1.md)
+  - Week 0 环境搭建
     - [Day 1 工具链搭建](docs/week0/day1.md)
     - [Day 2 AI 助手上手](docs/week0/day2.md)
     - [Day 3 项目初始化](docs/week0/day3.md)
@@ -9,7 +9,7 @@
     - [Day 6 数据结构](docs/week0/day6.md)
     - [Day 7 周复盘](docs/week0/day7.md)
 - **Phase 1: 地基**
-  - [Week 1 Python 工程化](docs/week1/day1.md)
+  - Week 1 Python 工程化
     - [Day 1 环境搭建](docs/week1/day1.md)
     - [Day 2 HTTP 基础](docs/week1/day2.md)
     - [Day 3 LLM API](docs/week1/day3.md)
@@ -17,7 +17,7 @@
     - [Day 5 CLI 工具](docs/week1/day5.md)
     - [Day 6 日志错误处理](docs/week1/day6.md)
     - [Day 7 重构测试](docs/week1/day7.md)
-  - [Week 2 FastAPI](docs/week2/day1.md)
+  - Week 2 FastAPI
     - [Day 1 FastAPI 入门](docs/week2/day1.md)
     - [Day 2 路由验证](docs/week2/day2.md)
     - [Day 3 数据库 ORM](docs/week2/day3.md)
@@ -25,7 +25,7 @@
     - [Day 5 WebSocket](docs/week2/day5.md)
     - [Day 6 结构化输出](docs/week2/day6.md)
     - [Day 7 测试复盘](docs/week2/day7.md)
-  - [Week 3 LLM 原理](docs/week3/day1.md)
+  - Week 3 LLM 原理
     - [Day 1 NLP 基础](docs/week3/day1.md)
     - [Day 2 Transformer](docs/week3/day2.md)
     - [Day 3 LLM 对比](docs/week3/day3.md)
@@ -33,7 +33,7 @@
     - [Day 5 Agent 判断](docs/week3/day5.md)
     - [Day 6 API 实践](docs/week3/day6.md)
     - [Day 7 复盘](docs/week3/day7.md)
-  - [Week 4 Agent 范式](docs/week4/day1.md)
+  - Week 4 Agent 范式
     - [Day 1 智能体基础](docs/week4/day1.md)
     - [Day 2 ReAct](docs/week4/day2.md)
     - [Day 3 Plan-and-Solve](docs/week4/day3.md)
@@ -42,7 +42,7 @@
     - [Day 6 工作流模式](docs/week4/day6.md)
     - [Day 7 复盘](docs/week4/day7.md)
 - **Phase 2: 核心能力**
-  - [Week 5 RAG](docs/week5/day1.md)
+  - Week 5 RAG
     - [Day 1 RAG 原理](docs/week5/day1.md)
     - [Day 2 向量数据库](docs/week5/day2.md)
     - [Day 3 文档处理](docs/week5/day3.md)
@@ -50,7 +50,7 @@
     - [Day 5 Query 改写](docs/week5/day5.md)
     - [Day 6 RAG 评估](docs/week5/day6.md)
     - [Day 7 Agentic RAG](docs/week5/day7.md)
-  - [Week 6 框架安全](docs/week6/day1.md)
+  - Week 6 框架安全
     - [Day 1 Function Calling](docs/week6/day1.md)
     - [Day 2 LangChain](docs/week6/day2.md)
     - [Day 3 LangGraph](docs/week6/day3.md)
@@ -58,7 +58,7 @@
     - [Day 5 Guardrails](docs/week6/day5.md)
     - [Day 6 HITL](docs/week6/day6.md)
     - [Day 7 复盘](docs/week6/day7.md)
-  - [Week 7 记忆系统](docs/week7/day1.md)
+  - Week 7 记忆系统
     - [Day 1 上下文工程](docs/week7/day1.md)
     - [Day 2 记忆架构](docs/week7/day2.md)
     - [Day 3 记忆实现](docs/week7/day3.md)
@@ -66,7 +66,7 @@
     - [Day 5 工作流整合](docs/week7/day5.md)
     - [Day 6 错误处理](docs/week7/day6.md)
     - [Day 7 复盘](docs/week7/day7.md)
-  - [Week 8 通信协议](docs/week8/day1.md)
+  - Week 8 通信协议
     - [Day 1 MCP 协议](docs/week8/day1.md)
     - [Day 2 A2A+NLWeb](docs/week8/day2.md)
     - [Day 3 多 Agent 架构](docs/week8/day3.md)
@@ -74,7 +74,7 @@
     - [Day 5 CrewAI](docs/week8/day5.md)
     - [Day 6 多 Agent Demo](docs/week8/day6.md)
     - [Day 7 复盘](docs/week8/day7.md)
-  - [Week 9 项目实战](docs/week9/day1.md)
+  - Week 9 项目实战
     - [Day 1 项目选型](docs/week9/day1.md)
     - [Day 2 后端骨架](docs/week9/day2.md)
     - [Day 3 RAG 集成](docs/week9/day3.md)
@@ -83,7 +83,7 @@
     - [Day 6 联调](docs/week9/day6.md)
     - [Day 7 复盘](docs/week9/day7.md)
 - **Phase 3: 进阶专精**
-  - [Week 10 Agentic RL](docs/week10/day1.md)
+  - Week 10 Agentic RL
     - [Day 1 SFT-RLHF](docs/week10/day1.md)
     - [Day 2 LoRA](docs/week10/day2.md)
     - [Day 3 DPO-GRPO](docs/week10/day3.md)
@@ -91,7 +91,7 @@
     - [Day 5 微调实验](docs/week10/day5.md)
     - [Day 6 评测分析](docs/week10/day6.md)
     - [Day 7 复盘](docs/week10/day7.md)
-  - [Week 11 评估](docs/week11/day1.md)
+  - Week 11 评估
     - [Day 1 评估框架](docs/week11/day1.md)
     - [Day 2 行业基准](docs/week11/day2.md)
     - [Day 3 评估 Pipeline](docs/week11/day3.md)
@@ -99,7 +99,7 @@
     - [Day 5 LangSmith](docs/week11/day5.md)
     - [Day 6 迭代优化](docs/week11/day6.md)
     - [Day 7 复盘](docs/week11/day7.md)
-  - [Week 12 生产部署](docs/week12/day1.md)
+  - Week 12 生产部署
     - [Day 1 Docker+密钥](docs/week12/day1.md)
     - [Day 2 CI/CD](docs/week12/day2.md)
     - [Day 3 Fallback+vLLM](docs/week12/day3.md)
@@ -107,7 +107,7 @@
     - [Day 5 限流+Sandbox](docs/week12/day5.md)
     - [Day 6 监控告警](docs/week12/day6.md)
     - [Day 7 复盘](docs/week12/day7.md)
-  - [Week 13 选修](docs/week13/day1.md)
+  - Week 13 选修
     - [Day 1 从零搭建 LLM](docs/week13/day1.md)
     - [Day 2 构建 Agent 框架](docs/week13/day2.md)
     - [Day 3 多模态+语音](docs/week13/day3.md)
@@ -116,6 +116,6 @@
     - [Day 6 案例+踩坑](docs/week13/day6.md)
     - [Day 7 Skill 写作](docs/week13/day7.md)
 - **Phase 4: 综合项目**
-  - [Week 14-17 项目实战](docs/week14/day1-7.md)
+  - Week 14-17 项目实战
 - **Phase 5: 毕业冲刺**
-  - [Week 18-20 毕业](docs/week18/day1-7.md)
+  - Week 18-20 毕业

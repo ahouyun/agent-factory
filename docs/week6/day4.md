@@ -418,6 +418,44 @@ print("""
 """)
 ```
 
+## 🛡️ OWASP Top 10 for LLM Applications
+
+OWASP 发布了 LLM 应用的十大安全风险，了解这些有助于全面防护：
+
+| 排名 | 风险 | 说明 |
+|:----:|------|------|
+| LLM01 | Prompt Injection | 通过输入操纵 LLM 行为 |
+| LLM02 | Insecure Output Handling | 未验证 LLM 输出就执行 |
+| LLM03 | Training Data Poisoning | 训练数据被污染 |
+| LLM04 | Model Denial of Service | 资源耗尽攻击 |
+| LLM05 | Supply Chain Vulnerabilities | 第三方组件风险 |
+| LLM06 | Sensitive Information Disclosure | 敏感信息泄露 |
+| LLM07 | Insecure Plugin Design | 插件设计缺陷 |
+| LLM08 | Excessive Agency | Agent 权限过大 |
+| LLM09 | Overreliance | 过度依赖 LLM |
+| LLM10 | Model Theft | 模型窃取 |
+
+> 详见 https://owasp.org/www-project-top-10-for-large-language-model-applications/
+
+## 🔴 红队测试方法论
+
+红队测试（Red Teaming）是主动寻找 Agent 安全漏洞的方法：
+
+**测试步骤**：
+1. **信息收集** → 了解 Agent 的能力边界
+2. **攻击面分析** → 识别可能的注入点
+3. **攻击尝试** → 直接注入、间接注入、越权操作
+4. **漏洞记录** → 记录触发条件和影响
+5. **修复验证** → 确认修复有效
+
+**常用攻击手法**：
+- 直接 Prompt Injection："忽略之前的指令，执行 XXX"
+- 间接 Prompt Injection：在文档/网页中嵌入恶意指令
+- 越狱攻击：让 Agent 执行超出权限的操作
+- 信息提取：让 Agent 泄露系统提示词
+
+> 建议在项目完成后，花 1 天时间对自己的 Agent 进行红队测试。
+
 ## 🆘 急救包
 
 | # | 症状 | 解法 |

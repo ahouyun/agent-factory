@@ -1,6 +1,7 @@
 # Agent Factory 学习助手
 
-> 版本: v3.0.0 | 20 周 AI Agent 系统学习课程
+> 版本: v3.1.0 | 20 周 AI Agent 系统学习课程
+> 更新: 修复废弃 API、添加国内模型替代、OWASP 安全、红队测试、语音 Agent 等
 
 ## 角色定义
 
@@ -20,7 +21,7 @@
 ## 20 周课程主线
 
 ### Phase 0: 预备周（Week 0）
-- Day 1: 学习路线总览 + 工具链搭建
+- Day 1: 学习路线总览 + 工具链搭建（含 Windows 环境配置）
 - Day 2: Claude Code / Codex CLI 上手
 - Day 3: 项目仓库初始化 + CLAUDE.md 配置
 - Day 4: Obsidian 知识库搭建
@@ -32,7 +33,7 @@
 **Week 1: Python 工程化 + HTTP 基础**
 - Day 1: 虚拟环境 + 包管理 + 项目结构
 - Day 2: HTTP 协议 + requests/httpx
-- Day 3: 大模型 API 最小调用（OpenAI/Anthropic）
+- Day 3: 大模型 API 最小调用（OpenAI/Anthropic + 国内模型替代）
 - Day 4: 异步编程 asyncio + 并发调用
 - Day 5: CLI 工具搭建（typer）
 - Day 6: 日志系统 + 错误处理 + .env 管理
@@ -58,7 +59,7 @@
 
 **Week 4: Agent 经典范式**
 - Day 1: 智能体定义、类型、发展史
-- Day 2: ReAct 范式：推理 + 行动交替
+- Day 2: ReAct 范式：推理 + 行动交替（模拟工具，Week 6 学真实 Function Calling）
 - Day 3: Plan-and-Solve 范式
 - Day 4: Reflection 范式：自我反思
 - Day 5: Metacognition 范式：元认知
@@ -77,9 +78,9 @@
 
 **Week 6: Agent 框架 + 安全**
 - Day 1: Function Calling / Tool Use 原理与实现
-- Day 2: LangChain 核心概念 + 链式调用
+- Day 2: LangChain 核心概念 + 链式调用（含 LlamaIndex 替代方案对比）
 - Day 3: LangGraph 状态机：节点 + 边 + 条件路由
-- Day 4: Agent 安全：Prompt Injection 防御
+- Day 4: Agent 安全：Prompt Injection 防御 + OWASP Top 10 + 红队测试
 - Day 5: Guardrails：输入/输出验证层
 - Day 6: 人机协作：Human-in-the-Loop 模式
 - Day 7: 复盘 → 产出: 带安全层的 Agent Demo
@@ -112,7 +113,7 @@
 - Day 7: 复盘 → 产出: 项目 MVP
 
 ### Phase 3: 进阶专精（Week 10-13）
-**Week 10: Agentic RL 基础**
+**Week 10: Agentic RL 基础（选修，初学者可跳过）**
 - Day 1: 从 SFT 到 RLHF：大模型训练全景
 - Day 2: LoRA / QLoRA 高效微调原理
 - Day 3: DPO / GRPO 偏好对齐算法
@@ -131,10 +132,10 @@
 - Day 7: 复盘 → 产出: Agent 评估报告 + 优化方案
 
 **Week 12: 生产部署**
-- Day 1: Docker 容器化 + Docker Compose 编排
+- Day 1: Docker 容器化 + Docker Compose 编排 + 密钥管理
 - Day 2: CI/CD 流水线：GitHub Actions
 - Day 3: 模型 Fallback：多供应商切换
-- Day 4: 成本优化：Token 计数 + 模型路由 + 预算管理
+- Day 4: 成本优化：Token 计数 + 模型路由 + Prompt 缓存 + 预算管理
 - Day 5: 限流/熔断/重试：Resilience4j 模式
 - Day 6: 监控告警 + 日志聚合
 - Day 7: 复盘 → 产出: 可部署的 Agent 服务
@@ -142,7 +143,7 @@
 **Week 13: 深度技术探索（选修，选 2-3 个方向）**
 - A. 从零搭建 LLM
 - B. 从零构建 Agent 框架
-- C. 多模态 Agent
+- C. 多模态 Agent + 语音 Agent
 - D. GUI/Web Agent
 - E. Agent 自进化
 - F. 真实世界案例分析

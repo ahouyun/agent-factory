@@ -526,6 +526,23 @@ if __name__ == "__main__":
 - 今天最大的收获: ...
 - 还不太确定的: ...
 
+## 🔮 延伸：Computer Use Agent
+
+元认知的一个重要应用是 Computer Use Agent——Agent 能够操作电脑界面（浏览器、桌面应用）来完成任务。
+
+**核心思路**：
+1. 截图 → 视觉模型理解界面
+2. 元认知判断 → 需要什么操作
+3. 执行操作 → 点击、输入、滚动
+4. 观察结果 → 判断是否成功
+
+**代表项目**：
+- Anthropic Computer Use（Claude 操作电脑）
+- OpenAI Operator（GPT 操作浏览器）
+- OpenAdapt（开源 Computer Use 框架）
+
+> 这是 2025-2026 年最热门的 Agent 方向之一。Week 13 选修模块会深入学习。
+
 ## 📥 明日同步接口
 - 今日完成度: ...
 - 卡点描述: ...

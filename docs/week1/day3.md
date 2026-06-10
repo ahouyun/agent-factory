@@ -1,5 +1,7 @@
 # 📅 Week 1 Day 3：大模型 API 最小调用（OpenAI/Anthropic）
 
+> 💡 提示：如果你还不了解 Transformer 和 LLM 的工作原理，不用担心。Week 3 会详细讲解这些概念。现在先学会调用 API，后面再深入理解原理。
+
 ## 🧭 今日方向
 > 今天我们将学习如何调用 OpenAI 和 Anthropic 的大模型 API。这是构建 AI Agent 的核心技能。
 
@@ -31,13 +33,14 @@
 ## 💻 代码区
 
 ```python
-# OpenAI API 调用示例
+# OpenAI API 调用示例（新版 SDK，适用于 openai >= 1.0）
 
-import openai
+from openai import OpenAI
 from typing import Optional
 
-# 设置 API 密钥（实际使用时应从环境变量获取）
-# openai.api_key = "your-openai-api-key-here"
+# 创建客户端（实际使用时应从环境变量获取 API 密钥）
+# client = OpenAI(api_key="your-openai-api-key-here")
+client = OpenAI()  # 从 OPENAI_API_KEY 环境变量自动读取
 
 def basic_chat_completion(
     prompt: str,
@@ -56,7 +59,7 @@ def basic_chat_completion(
         模型响应
     """
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "user", "content": prompt}
@@ -67,7 +70,7 @@ def basic_chat_completion(
         
         return response.choices[0].message.content.strip()
     
-    except openai.error.OpenAIError as e:
+    except Exception as e:
         print(f"OpenAI API 错误: {e}")
         return ""
 
@@ -88,7 +91,7 @@ def chat_with_system_message(
         模型响应
     """
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": system_message},
@@ -99,7 +102,7 @@ def chat_with_system_message(
         
         return response.choices[0].message.content.strip()
     
-    except openai.error.OpenAIError as e:
+    except Exception as e:
         print(f"OpenAI API 错误: {e}")
         return ""
 
@@ -113,7 +116,7 @@ def multi_turn_conversation():
     user_input = "什么是列表推导式？"
     messages.append({"role": "user", "content": user_input})
     
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=messages,
         temperature=0.7
@@ -129,7 +132,7 @@ def multi_turn_conversation():
     user_input = "能给我一个例子吗？"
     messages.append({"role": "user", "content": user_input})
     
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=messages,
         temperature=0.7
@@ -363,6 +366,80 @@ if __name__ == "__main__":
     # 创建 .env 模板
     create_env_file()
 ```
+
+## 🇨🇳 国内模型替代方案
+
+如果你无法访问 OpenAI 或 Anthropic 的 API，可以使用以下国内模型作为替代。它们同样强大，且注册和使用更加方便。
+
+### 主要选项
+
+| 模型提供商 | 地址 | 特点 |
+|-----------|------|------|
+| **DeepSeek** | https://platform.deepseek.com/ | 兼容 OpenAI SDK，性价比极高 |
+| **通义千问** | https://dashscope.aliyun.com/ | 阿里云提供，生态完善 |
+| **Moonshot (月之暗面)** | https://platform.moonshot.cn/ | Kimi 背后的公司，长文本能力强 |
+| **智谱** | https://open.bigmodel.cn/ | GLM 系列，清华系背景 |
+| **Ollama 本地部署** | https://ollama.com/ | 完全免费，无需联网 |
+
+### DeepSeek API 使用示例
+
+DeepSeek 的 API 与 OpenAI 完全兼容，只需修改 `base_url` 和 `api_key`：
+
+```python
+from openai import OpenAI
+
+# 使用 DeepSeek API（兼容 OpenAI SDK）
+client = OpenAI(
+    api_key="your-deepseek-key",
+    base_url="https://api.deepseek.com"
+)
+
+response = client.chat.completions.create(
+    model="deepseek-chat",
+    messages=[
+        {"role": "system", "content": "你是一个有帮助的助手。"},
+        {"role": "user", "content": "什么是人工智能？"}
+    ],
+    temperature=0.7
+)
+
+print(response.choices[0].message.content)
+```
+
+### Ollama 本地部署示例
+
+如果你想完全免费地使用大模型，可以使用 Ollama 在本地运行开源模型：
+
+```bash
+# 1. 安装 Ollama（https://ollama.com/ 下载安装包）
+
+# 2. 下载并运行模型
+ollama run qwen2.5:7b       # 通义千问 7B
+ollama run deepseek-r1:8b   # DeepSeek 8B
+ollama run glm4:9b          # 智谱 GLM4 9B
+```
+
+```python
+# Ollama 本地模型调用（兼容 OpenAI SDK）
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="ollama",  # Ollama 不需要真实密钥
+    base_url="http://localhost:11434/v1"
+)
+
+response = client.chat.completions.create(
+    model="qwen2.5:7b",  # 使用你下载的模型
+    messages=[
+        {"role": "user", "content": "用Python写一个快速排序算法"}
+    ],
+    temperature=0.7
+)
+
+print(response.choices[0].message.content)
+```
+
+> **提示**: 国内模型的 API 调用方式与 OpenAI 基本一致，只要支持 OpenAI 兼容接口，只需修改 `base_url` 和 `api_key` 即可无缝切换。
 
 ## 🆘 急救包
 | # | 症状 | 解法 |

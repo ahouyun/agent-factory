@@ -106,6 +106,67 @@ if __name__ == "__main__":
 - 今天最大的收获: ...
 - 还不太确定的: ...
 
+## 🪟 Windows 用户注意
+
+如果你使用的是 Windows 系统，以下几点需要特别注意：
+
+### PowerShell vs cmd vs WSL 的区别
+
+| 终端 | 特点 | 推荐度 |
+|------|------|--------|
+| **PowerShell** | Windows 默认终端，功能强大，支持现代命令 | ⭐⭐⭐⭐⭐ |
+| **cmd** | 老式命令提示符，功能有限，部分命令不兼容 | ⭐⭐ |
+| **WSL** | Windows 子系统 for Linux，可运行完整 Linux 环境 | ⭐⭐⭐⭐ |
+
+**建议**: 日常开发推荐使用 **PowerShell** 或 **WSL**。如果你主要跟随本教程学习，PowerShell 即可满足需求。如果你需要与 Linux 环境保持一致（如后续部署），可以考虑安装 WSL。
+
+### 虚拟环境激活方式不同
+
+在 Windows 上，激活 Python 虚拟环境的命令与 macOS/Linux 不同：
+
+```bash
+# macOS / Linux 的激活方式
+source venv/bin/activate
+
+# Windows PowerShell 的激活方式
+venv\Scripts\activate
+
+# Windows cmd 的激活方式
+venv\Scripts\activate.bat
+```
+
+**常见问题**: 如果在 PowerShell 中遇到执行策略错误，可以先运行以下命令：
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Docker Desktop 在 Windows 上的注意事项
+
+- 下载并安装 **Docker Desktop for Windows**（不是 Linux 版本）
+- 安装前需要开启 **WSL 2** 或 **Hyper-V** 虚拟化功能
+- Docker Desktop 安装包较大（约 500MB），请确保网络通畅
+- 首次启动较慢，需要等待 Docker 引擎初始化完成
+- 如果使用 WSL 2 后端，建议分配至少 **4GB 内存**给 Docker
+
+### 路径分隔符差异
+
+Windows 使用反斜杠 `\` 作为路径分隔符，而 macOS/Linux 使用正斜杠 `/`：
+
+```python
+# Windows 路径
+path = "C:\\Users\\username\\project\\data\\file.txt"
+
+# macOS / Linux 路径
+path = "/home/username/project/data/file.txt"
+
+# Python 推荐写法（跨平台兼容）
+from pathlib import Path
+path = Path("project") / "data" / "file.txt"
+```
+
+**建议**: 在 Python 代码中尽量使用 `pathlib.Path`，它会自动处理不同操作系统的路径分隔符，避免跨平台兼容问题。
+
 ## 📥 明日同步接口
 - 今日完成度: ...
 - 卡点描述: ...

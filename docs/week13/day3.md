@@ -1,5 +1,51 @@
 # 📅 Week 13 Day 3：方向C - 多模态 Agent
 
+## 🎤 语音 Agent 架构
+
+语音 Agent 的核心流程：
+
+```
+用户语音 → [STT] 文本 → [LLM] 推理 → [TTS] 语音 → 用户
+```
+
+### 关键组件
+
+| 组件 | 功能 | 代表方案 |
+|------|------|---------|
+| STT（语音转文本） | 识别用户语音 | Whisper / 阿里 Paraformer |
+| LLM（大语言模型） | 理解和生成回复 | GPT-4o / Claude / DeepSeek |
+| TTS（文本转语音） | 生成语音回复 | ElevenLabs / CosyVoice |
+
+### 实现示例
+
+```python
+import openai
+from faster_whisper import WhisperModel
+
+# 1. 语音转文本
+whisper = WhisperModel("base")
+segments, _ = whisper.transcribe("audio.wav")
+text = " ".join([s.text for s in segments])
+
+# 2. LLM 推理
+client = OpenAI()
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": text}]
+)
+reply = response.choices[0].message.content
+
+# 3. 文本转语音（使用 TTS API）
+speech_response = client.audio.speech.create(
+    model="tts-1",
+    voice="alloy",
+    input=reply
+)
+speech_response.stream_to_file("output.mp3")
+```
+
+> 语音 Agent 是 2025-2026 年的热门方向，OpenAI 的 Advanced Voice Mode 和 Gemini 的多模态能力都在推动这一领域发展。
+
 ## 🧭 今日方向
 > 学习如何构建能够处理多种模态（文本、图像、音频）的 Agent 系统。
 

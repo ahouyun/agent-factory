@@ -1,5 +1,22 @@
 # 📅 Week 12 Day 1：Docker 容器化 + Docker Compose 编排
 
+## 🔐 生产环境密钥管理
+
+**永远不要把 API Key 硬编码在代码中！** 生产环境需要专业的密钥管理：
+
+| 方案 | 适用场景 | 说明 |
+|------|---------|------|
+| .env 文件 | 开发环境 | 本地开发使用，不要提交到 Git |
+| Docker Secrets | Docker 部署 | Docker 原生支持 |
+| HashiCorp Vault | 企业级 | 专业的密钥管理服务 |
+| 云厂商 KMS | 云部署 | AWS Secrets Manager / 阿里云 KMS |
+
+**最佳实践**：
+1. 开发环境：使用 `.env` + `.gitignore`
+2. Docker 部署：使用 `docker-compose.yml` 的 `secrets` 配置
+3. 生产环境：使用云厂商密钥管理服务
+4. 轮换策略：定期更换 API Key
+
 ## 🧭 今日方向
 > 学习如何使用 Docker 容器化 Agent 应用，以及使用 Docker Compose 编排多服务系统。
 

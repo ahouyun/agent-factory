@@ -1,5 +1,41 @@
 # 📅 Week 12 Day 4：成本优化：Token 计数 + 模型路由
 
+## 💾 Prompt 缓存策略
+
+Prompt 缓存可以显著降低 API 调用成本：
+
+### 1. 语义缓存
+将相似的查询缓存起来，避免重复调用 LLM：
+```python
+# 伪代码
+cache_key = compute_embedding(query)
+if cache_key in semantic_cache:
+    return semantic_cache[cache_key]
+else:
+    result = llm.call(query)
+    semantic_cache[cache_key] = result
+    return result
+```
+
+### 2. 前缀缓存（Prefix Caching）
+OpenAI 和 Anthropic 都支持 System Prompt 缓存：
+- OpenAI: 自动缓存相同前缀的请求
+- Anthropic: 使用 `cache_control` 参数控制
+
+### 3. 批量处理
+对非实时任务使用 Batch API，成本降低 50%：
+```python
+# OpenAI Batch API
+response = client.batches.create(input_file_id=file_id, endpoint="/v1/chat/completions")
+```
+
+### 成本对比
+| 方案 | 节省比例 | 适用场景 |
+|------|---------|---------|
+| 语义缓存 | 30-60% | 重复性查询 |
+| 前缀缓存 | 50-90% | 长 System Prompt |
+| 批量处理 | 50% | 非实时任务 |
+
 ## 🧭 今日方向
 > 学习如何通过 Token 计数和智能模型路由来优化 Agent 系统的成本。
 

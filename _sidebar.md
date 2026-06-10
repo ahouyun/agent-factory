@@ -1,5 +1,6 @@
 - [🏠 首页](/)
 - **Phase 0: 预备周**
+  - [Phase 0 概览](docs/week0/day1.md)
   - [Day 1 工具链搭建](docs/week0/day1.md)
   - [Day 2 AI 助手上手](docs/week0/day2.md)
   - [Day 3 项目初始化](docs/week0/day3.md)
@@ -8,6 +9,7 @@
   - [Day 6 数据结构](docs/week0/day6.md)
   - [Day 7 周复盘](docs/week0/day7.md)
 - **Phase 1: 地基**
+  - [Phase 1 概览](docs/week1/day1.md)
   - [W1-Day 1 环境搭建](docs/week1/day1.md)
   - [W1-Day 2 HTTP 基础](docs/week1/day2.md)
   - [W1-Day 3 LLM API](docs/week1/day3.md)
@@ -37,6 +39,7 @@
   - [W4-Day 6 工作流模式](docs/week4/day6.md)
   - [W4-Day 7 复盘](docs/week4/day7.md)
 - **Phase 2: 核心能力**
+  - [Phase 2 概览](docs/week5/day1.md)
   - [W5-Day 1 RAG 原理](docs/week5/day1.md)
   - [W5-Day 2 向量数据库](docs/week5/day2.md)
   - [W5-Day 3 文档处理](docs/week5/day3.md)
@@ -73,6 +76,7 @@
   - [W9-Day 6 联调](docs/week9/day6.md)
   - [W9-Day 7 复盘](docs/week9/day7.md)
 - **Phase 3: 进阶专精**
+  - [Phase 3 概览](docs/week10/day1.md)
   - [W10-Day 1 SFT到RLHF](docs/week10/day1.md)
   - [W10-Day 2 LoRA/QLoRA](docs/week10/day2.md)
   - [W10-Day 3 DPO/GRPO](docs/week10/day3.md)

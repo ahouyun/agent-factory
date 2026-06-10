@@ -365,6 +365,76 @@ if __name__ == "__main__":
     main()
 ```
 
+## 🧬 Agent 自进化详解
+
+### 自进化的四种模式
+
+| 模式 | 说明 | 实现方式 |
+|------|------|---------|
+| 经验积累 | 记住成功/失败的经验 | 长期记忆 + 反馈循环 |
+| 技能学习 | 从新任务中学习新技能 | Few-shot + 工具注册 |
+| 策略优化 | 优化决策策略 | 强化学习 + 奖励模型 |
+| 知识更新 | 更新内部知识库 | RAG + 知识图谱 |
+
+### 自进化循环
+
+```
+执行任务 → 观察结果 → 反思总结 → 更新策略 → 执行新任务
+    ↑                                              │
+    └──────────────────────────────────────────────┘
+```
+
+### 代表项目
+
+| 项目 | 自进化方式 | 特点 |
+|------|-----------|------|
+| Voyager (Minecraft) | 技能库 + 代码生成 | 在游戏中学习新技能 |
+| Generative Agents | 记忆 + 反思 | 模拟人类行为 |
+| Reflexion | 语言反思 | 用自然语言总结经验 |
+| ADAS | 自动决策 | 自动调整 Agent 策略 |
+
+### 实现一个简单的自进化 Agent
+
+```python
+class SelfEvolvingAgent:
+    def __init__(self):
+        self.memory = []  # 经验记忆
+        self.skills = {}  # 已学会的技能
+
+    def execute(self, task):
+        # 1. 尝试用已有技能
+        if task in self.skills:
+            result = self.skills[task]()
+        else:
+            result = self.learn_new_skill(task)
+
+        # 2. 反思结果
+        reflection = self.reflect(task, result)
+        self.memory.append(reflection)
+
+        # 3. 更新策略
+        if reflection["success"]:
+            self.reinforce(task)
+        else:
+            self.adapt(task, reflection)
+
+        return result
+
+    def learn_new_skill(self, task):
+        """从新任务中学习技能"""
+        # 用 LLM 生成解决方案
+        solution = self.llm.generate(f"如何完成: {task}")
+        # 保存为新技能
+        self.skills[task] = solution
+        return solution()
+
+    def reflect(self, task, result):
+        """反思执行结果"""
+        return self.llm.analyze(f"任务:{task}, 结果:{result}, 总结经验")
+```
+
+> Agent 自进化是 Agent 技术的终极方向之一，让 Agent 能够越用越聪明。
+
 ## 🆘 急救包
 | # | 症状 | 解法 |
 |---|------|------|

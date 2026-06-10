@@ -482,6 +482,48 @@ if __name__ == "__main__":
 - [ ] 能实现健康检查和自动切换
 - [ ] 代码能跑通
 
+## ⚡ vLLM 推理优化
+
+vLLM 是高性能的 LLM 推理引擎，适合生产环境部署：
+
+### 核心特性
+
+| 特性 | 说明 | 效果 |
+|------|------|------|
+| PagedAttention | 高效管理 KV Cache | 吞吐量提升 2-4x |
+| Continuous Batching | 动态批处理 | GPU 利用率提升 |
+| Tensor Parallelism | 多 GPU 并行 | 支持大模型 |
+| Quantization | INT4/INT8 量化 | 显存降低 50-75% |
+
+### 快速部署
+
+```bash
+# 安装 vLLM
+pip install vllm
+
+# 启动 API 服务
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --port 8000
+
+# 客户端调用（兼容 OpenAI SDK）
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="dummy")
+response = client.chat.completions.create(
+    model="Qwen/Qwen2.5-7B-Instruct",
+    messages=[{"role": "user", "content": "你好"}]
+)
+```
+
+### 性能对比
+
+| 引擎 | 吞吐量 | 延迟 | 适用场景 |
+|------|--------|------|---------|
+| vLLM | 高 | 低 | 生产部署 |
+| TGI | 高 | 低 | HuggingFace 生态 |
+| llama.cpp | 中 | 低 | CPU/边缘设备 |
+| Ollama | 中 | 中 | 本地开发 |
+
 ## 📝 复盘小纸条
 - 今天最大的收获: ...
 - 还不太确定的: ...

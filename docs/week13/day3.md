@@ -319,6 +319,50 @@ if __name__ == "__main__":
     main()
 ```
 
+## 🖼️ VLM 视觉语言模型微调
+
+### 什么是 VLM
+
+VLM（Vision Language Model）是能够同时理解图像和文本的模型：
+
+| 模型 | 特点 | 适用场景 |
+|------|------|---------|
+| GPT-4o | 多模态，支持图像理解 | 通用图像理解 |
+| Claude 3.5 | 强大的视觉推理 | 复杂图像分析 |
+| Qwen-VL | 开源，支持中文 | 本地部署 |
+| LLaVA | 开源，可微调 | 定制化需求 |
+
+### 微调 VLM 的场景
+
+- **文档 OCR**：识别特定格式的文档
+- **产品质检**：识别产品缺陷
+- **医学影像**：辅助诊断
+- **自动驾驶**：场景理解
+
+### 微调方法
+
+```python
+# 使用 LLaVA 微调示例
+from llava.model import LlavaLlamaForCausalLM
+from transformers import TrainingArguments
+
+# 加载预训练模型
+model = LlavaLlamaForCausalLM.from_pretrained("liuhaotian/llava-v1.5-7b")
+
+# 配置训练参数
+training_args = TrainingArguments(
+    output_dir="./vlm-finetuned",
+    num_train_epochs=3,
+    per_device_train_batch_size=4,
+    learning_rate=2e-5,
+)
+
+# 准备图像-文本对数据
+# 每个样本包含：图像 + 问题 + 回答
+```
+
+> VLM 微调需要 GPU 资源（建议 24GB+ 显存），初学者可以先了解概念，后续有资源时再实践。
+
 ## 🆘 急救包
 | # | 症状 | 解法 |
 |---|------|------|

@@ -467,6 +467,44 @@ print("""
 """)
 ```
 
+## 🔗 OpenAI Agents SDK 的 Sessions & Memory
+
+OpenAI Agents SDK 提供了内置的持久化记忆层，支持跨会话保持工作上下文：
+
+### 支持的后端
+
+| 后端 | 适用场景 | 特点 |
+|------|---------|------|
+| SQLite | 开发/测试 | 轻量级，无需额外服务 |
+| SQLAlchemy | 生产环境 | 支持 PostgreSQL/MySQL |
+| Redis | 高性能场景 | 内存级速度 |
+| MongoDB | 灵活 schema | 文档型存储 |
+
+### 使用示例
+
+```python
+from agents import Agent, Runner
+from agents.memory import SQLiteMemory
+
+# 创建带记忆的 Agent
+memory = SQLiteMemory(db_path="./agent_memory.db")
+agent = Agent(
+    name="Assistant",
+    instructions="You are a helpful assistant with memory.",
+    memory=memory
+)
+
+# 第一轮对话
+result1 = Runner.run_sync(agent, "我叫张三，是程序员")
+# 记忆自动保存
+
+# 第二轮对话（跨会话）
+result2 = Runner.run_sync(agent, "我叫什么名字？")
+# Agent 会记住：你叫张三，是程序员
+```
+
+> Sessions & Memory 是 OpenAI Agents SDK 的核心特性之一，适合需要长期交互的 Agent 场景。
+
 ## 🆘 急救包
 
 | # | 症状 | 解法 |

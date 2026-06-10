@@ -569,6 +569,52 @@ if __name__ == "__main__":
 - [ ] 能设计针对特定任务的奖励函数
 - [ ] 理解数据增强对 Agent 训练的重要性
 
+## 📝 训练数据预处理
+
+在构造 Agent 训练数据之前，需要进行预处理：
+
+### 数据清洗
+
+| 步骤 | 说明 | 工具 |
+|------|------|------|
+| 去重 | 移除重复样本 | deduplicate-text-datasets |
+| 过滤 | 移除低质量/有害内容 | detoxify |
+| 格式化 | 统一对话格式 | 自定义脚本 |
+| 标注 | 添加质量标签 | 人工 + LLM 辅助 |
+
+### 数据格式转换
+
+```python
+# 将对话数据转换为训练格式
+def convert_to_training_format(conversations):
+    """将多轮对话转换为 SFT 训练格式"""
+    messages = []
+    for turn in conversations:
+        messages.append({
+            "role": turn["role"],
+            "content": turn["content"]
+        })
+    return {"messages": messages}
+
+# 示例
+data = [
+    {"role": "user", "content": "请帮我查询天气"},
+    {"role": "assistant", "content": "我来帮你查询天气...", "tool_calls": [...]},
+    {"role": "tool", "content": '{"temperature": 25}'},
+    {"role": "assistant", "content": "今天气温 25°C，适合外出。"}
+]
+training_sample = convert_to_training_format(data)
+```
+
+### 数据质量评估
+
+| 指标 | 说明 | 目标值 |
+|------|------|--------|
+| 对话完整性 | 每轮都有合理的回复 | > 95% |
+| 工具调用正确性 | tool_calls 格式正确 | > 90% |
+| 内容相关性 | 回复与问题相关 | > 85% |
+| 多样性 | 涵盖多种场景 | 高 |
+
 ## 📝 复盘小纸条
 - 今天最大的收获: ...
 - 还不太确定的: ...

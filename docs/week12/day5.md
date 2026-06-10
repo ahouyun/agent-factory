@@ -572,6 +572,52 @@ if __name__ == "__main__":
 - [ ] 能实现智能重试
 - [ ] 代码能跑通
 
+## 📦 Sandbox Agents（隔离沙箱）
+
+OpenAI Agents SDK 支持在隔离沙箱中运行 Agent，提高安全性：
+
+### 什么是 Sandbox
+
+Sandbox 为 Agent 提供一个隔离的执行环境：
+- 文件系统隔离：Agent 只能访问指定文件
+- 网络隔离：可限制网络访问
+- 资源限制：CPU/内存/磁盘配额
+- 可恢复：中断后可从 checkpoint 恢复
+
+### 使用场景
+
+| 场景 | 为什么需要 Sandbox |
+|------|-------------------|
+| 代码执行 Agent | 防止恶意代码破坏系统 |
+| 文件处理 Agent | 限制文件访问范围 |
+| 多租户 Agent | 隔离不同用户的数据 |
+| 测试环境 | 安全地测试 Agent 行为 |
+
+### 实现示例
+
+```python
+from agents import Agent, Runner
+from agents.sandbox import DockerSandbox
+
+# 创建沙箱配置
+sandbox = DockerSandbox(
+    image="python:3.11-slim",
+    memory_limit="512m",
+    cpu_period=100000,
+    cpu_quota=50000,  # 50% CPU
+)
+
+# 在沙箱中运行 Agent
+agent = Agent(
+    name="CodeExecutor",
+    instructions="Execute code safely",
+    sandbox=sandbox
+)
+result = Runner.run_sync(agent, "写一个排序算法")
+```
+
+> Sandbox 是生产环境的重要安全措施，特别是 Agent 需要执行不受信任的代码时。
+
 ## 📝 复盘小纸条
 - 今天最大的收获: ...
 - 还不太确定的: ...

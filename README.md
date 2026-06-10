@@ -38,6 +38,53 @@
 
 ---
 
+## 📚 如何学习
+
+### 第一步：环境准备
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/ahouyun/agent-factory.git
+cd agent-factory
+
+# 2. 安装 Python 3.10+
+# 3. 安装 Claude Code（可选）
+npm install -g @anthropic-ai/claude-code
+```
+
+### 第二步：选择学习方式
+
+| 方式 | 适合人群 | 说明 |
+|------|---------|------|
+| 🤖 **AI 助手模式** | 想要互动学习的人 | 加载 SKILL.md，每天生成任务 |
+| 📖 **直接阅读** | 喜欢自学的人 | 直接打开 `docs/week{N}/day{M}.md` |
+| 📓 **Obsidian 笔记** | 喜欢做笔记的人 | 用 Obsidian 打开项目目录 |
+
+### 第三步：开始学习
+
+```
+# AI 助手模式
+你: 生成 Day 1
+AI: 📅 Day 1：学习路线总览 + 工具链搭建
+    🧭 今日方向: ...
+    🎯 生活比喻: ...
+    📋 今日三件事: ...
+    💻 代码区: ...
+```
+
+### 第四步：跟踪进度
+
+每天学完后填写反馈：
+
+```
+- 今日完成度: 全部完成 / 部分完成 / 卡住了
+- 卡点描述: （具体问题）
+- 代码是否能跑通: 是 / 否
+- 明天希望: 继续推进 / 复习巩固 / 加难挑战
+```
+
+---
+
 ## 📖 课程大纲
 
 ### Phase 0: 预备周
@@ -279,9 +326,9 @@
 | Week 17 | 项目实战第 4 周 | [day1-7.md](docs/week17/day1-7.md) |
 
 **可选项目：**
-- ⭐ [AI-Interview 智能模拟面试系统](skill/references/phase-spine.md) — FastAPI + RAG + LangGraph + Guardrails
-- [DeepResearch 深度研究 Agent](skill/references/phase-spine.md) — 多 Agent + 搜索 + Handoff
-- [多智能体旅行助手](skill/references/phase-spine.md) — MCP + CrewAI + 外部 API
+- ⭐ AI-Interview 智能模拟面试系统 — FastAPI + RAG + LangGraph + Guardrails
+- DeepResearch 深度研究 Agent — 多 Agent + 搜索 + Handoff
+- 多智能体旅行助手 — MCP + CrewAI + 外部 API
 
 </details>
 
@@ -302,53 +349,28 @@
 
 ---
 
-## 🚀 如何使用
-
-### 方式 1：AI 助手模式（推荐）
-
-1. 克隆仓库
-```bash
-git clone https://github.com/ahouyun/agent-factory.git
-cd agent-factory
-```
-
-2. 打开 Obsidian，选择 `agent-factory` 目录作为 vault
-
-3. 在 Claude Code 中加载 `skill/SKILL.md`
-
-4. 开始学习
-```
-你: 生成 Day 1
-AI: 📅 Day 1：学习路线总览 + 工具链搭建
-    ...
-```
-
-### 方式 2：直接阅读
-
-直接打开 `docs/week{N}/day{M}.md` 文件阅读。
-
----
-
 ## 📁 项目结构
 
 ```
 agent-factory/
 ├── skill/                    # AI Skill 定义
 │   ├── SKILL.md              # 核心 Skill 文件
-│   └── references/           # 参考模板
+│   └── references/           # 参考模板（5个）
 ├── docs/                     # 20 周教程文档
 │   ├── week0/                # Day 1-7
 │   ├── week1/                # Day 1-7
 │   ├── ...
 │   └── week20/               # Day 1-7
-├── code/                     # 代码示例
-├── knowledge-base/           # Obsidian 知识库
+├── code/                     # 代码示例（学习时填充）
+├── knowledge-base/           # Obsidian 知识库（学习时填充）
 └── assessments/              # 评估题库
 ```
 
 ---
 
 ## 📚 来源致谢
+
+本项目融合了以下优秀开源项目的内容与设计理念：
 
 | 项目 | 社区 | Stars | 许可证 |
 |------|------|:-----:|--------|
@@ -367,6 +389,8 @@ agent-factory/
 
 ## 🤝 如何贡献
 
+我们欢迎以下形式的贡献：
+
 - 🐛 **报告 Bug** — 发现问题请提交 Issue
 - 💡 **提出建议** — 功能改进或内容补充
 - 📝 **完善内容** — 补充代码示例或学习笔记
@@ -374,6 +398,40 @@ agent-factory/
 
 ---
 
+## 🙏 致谢
+
+感谢所有为本项目提供灵感和内容的开源社区。
+
+特别感谢 [Datawhale](https://github.com/datawhalechina) 社区的 [hello-agents](https://github.com/datawhalechina/hello-agents) 和 [happy-llm](https://github.com/datawhalechina/happy-llm) 项目。
+
+---
+
+## 🎓 引用
+
+如果你在论文或项目中使用了本课程，可以通过以下 BibTeX 引用：
+
+```bibtex
+@misc{agent_factory2026,
+  title  = {Agent Factory: 从零到精通的 AI Agent 系统学习课程},
+  author = {ahouyun},
+  year   = {2026},
+  url    = {https://github.com/ahouyun/agent-factory},
+  note   = {GitHub repository}
+}
+```
+
+---
+
 ## 📜 开源协议
 
-本项目采用 [MIT License](LICENSE) 开源协议。引用的 CC BY-NC-SA 4.0 内容已注明出处。
+本项目采用 [MIT License](LICENSE) 开源协议。
+
+引用的 CC BY-NC-SA 4.0 内容已注明出处。
+
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对你有帮助，请给我们一个 Star！⭐**
+
+</div>

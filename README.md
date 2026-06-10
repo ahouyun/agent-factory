@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="docs/images/banner.png" width="100%" />
-
 # 🤖 Agent Factory
 
 ### 从零到精通的 AI Agent 系统学习课程

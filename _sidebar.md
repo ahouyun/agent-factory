@@ -1,0 +1,26 @@
+- [🏠 首页](/)
+- **Phase 0: 预备周**
+  - [Week 0 环境搭建](docs/week0/day1.md)
+- **Phase 1: 地基**
+  - [Week 1 Python 工程化](docs/week1/day1.md)
+  - [Week 2 FastAPI](docs/week2/day1.md)
+  - [Week 3 LLM 原理](docs/week3/day1.md)
+  - [Week 4 Agent 范式](docs/week4/day1.md)
+- **Phase 2: 核心能力**
+  - [Week 5 RAG](docs/week5/day1.md)
+  - [Week 6 框架+安全](docs/week6/day1.md)
+  - [Week 7 记忆系统](docs/week7/day1.md)
+  - [Week 8 通信协议](docs/week8/day1.md)
+  - [Week 9 项目实战](docs/week9/day1.md)
+- **Phase 3: 进阶专精**
+  - [Week 10 Agentic RL](docs/week10/day1.md)
+  - [Week 11 评估](docs/week11/day1.md)
+  - [Week 12 生产部署](docs/week12/day1.md)
+  - [Week 13 选修](docs/week13/day1.md)
+- **Phase 4: 综合项目**
+  - [Week 14-17 项目实战](docs/week14/day1-7.md)
+- **Phase 5: 毕业冲刺**
+  - [Week 18-20 毕业](docs/week18/day1-7.md)
+- **参考**
+  - [SKILL.md](skill/SKILL.md)
+  - [来源致谢](README.md#-来源致谢)

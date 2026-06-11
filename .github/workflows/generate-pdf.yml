@@ -1,0 +1,46 @@
+name: Generate PDF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  generate-pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install md-to-pdf
+        run: npm install -g md-to-pdf
+
+      - name: Create pdf directory
+        run: mkdir -p pdf
+
+      - name: Generate PDFs
+        run: |
+          for week in {0..13}; do
+            for day in {1..7}; do
+              file="docs/week${week}/day${day}.md"
+              if [ -f "$file" ]; then
+                echo "📄 Generating ${file}..."
+                md-to-pdf "$file" --output "pdf/week${week}-day${day}.pdf" || true
+              fi
+            done
+          done
+
+      - name: Upload PDF artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfs
+          path: pdf/*.pdf
+          retention-days: 30

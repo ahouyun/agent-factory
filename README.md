@@ -16,30 +16,9 @@
 
 <br/>
 
-[📚 在线阅读](https://ahouyun.github.io/agent-factory/) | [📄 PDF 下载](#-pdf-版本下载) | [🚀 快速开始](#-快速开始) | [📖 课程大纲](#-课程大纲) | [🙋 贡献指南](#-如何贡献)
+[📚 在线阅读](https://ahouyun.github.io/agent-factory/) | [🚀 快速开始](#-快速开始) | [📖 课程大纲](#-课程大纲) | [🙋 贡献指南](#-如何贡献)
 
 </div>
-
----
-
-## 📄 PDF 版本下载
-
-&emsp;&emsp;*本项目的 PDF 课件完全开源免费。为防止加水印后贩卖，我们特地在 PDF 文件中预先添加了不影响阅读的水印，敬请谅解～*
-
-> PDF 下载地址：https://github.com/ahouyun/agent-factory/releases/latest/
-
-### 如何生成 PDF
-
-```bash
-# 1. 安装 md-to-pdf
-npm install -g md-to-pdf
-
-# 2. 生成单个文件的 PDF
-md-to-pdf docs/week0/day1.md
-
-# 3. 或运行批量生成脚本
-node pdf/generate-pdf.js
-```
 
 ---
 

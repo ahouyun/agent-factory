@@ -1,444 +1,746 @@
-# 📅 Week 11 Day 7：复盘
+# 📝 Day 7: Week 11 复盘 — 评估方法论总结与自我评估
 
-## 🧭 今日方向
-> 回顾 Week 11 评估框架学习内容，总结关键知识点，梳理遗留问题，为下周做准备。
+## 今日方向
 
-## 🎯 生活比喻
-> 复盘就像项目总结会。你不是简单地汇报"做了什么"，而是深入分析"为什么这样做"、"效果如何"、"下次怎么改进"。好的复盘能让你的经验变成可复用的知识。
+> "学而不思则罔，思而不学则殆。" -- 《论语》
 
-## 📋 今日三件事
-1. 回顾本周 6 天的学习内容，画出知识图谱
-2. 整理本周遇到的问题和解决方案
-3. 制定下周学习计划
+今天我们来回顾 Week 11 的评估框架学习内容，总结关键知识点，构建你自己的评估清单，并进行自我评估。
 
-## 🗺️ 手把手路线
+## 生活比喻
 
-### Step 1：知识回顾
-- 做什么: 快速浏览每天的笔记，标注掌握程度
-- 为什么: 只有回顾才能发现遗忘的知识点
-- 成功标志: 能说出每天的核心知识点
+想象你在准备一场重要考试：
 
-### Step 2：问题梳理
-- 做什么: 整理本周遇到的所有问题和解决方案
-- 为什么: 问题就是最好的学习机会
-- 成功标志: 能列出 5 个以上的问题及解法
+- **前六天** = 学习各科知识
+- **今天** = 考前复习，整理笔记，查漏补缺
 
-### Step 3：知识连接
-- 做什么: 找出各知识点之间的联系
-- 为什么: 知识只有连接起来才有价值
-- 成功标志: 能画出知识图谱
+今天就是我们的"考前复习日"。
 
-### Step 4：制定计划
-- 做什么: 规划下周的学习重点
-- 为什么: 有计划才能高效学习
-- 成功标志: 有明确的下周目标
+## 今日三件事
 
-## 💻 代码区
+1. **回顾本周内容**：梳理评估框架的核心知识点
+2. **构建评估清单**：创建你自己的 Agent 评估检查表
+3. **自我评估**：评估你对评估方法论的掌握程度
+
+---
+
+## 手把手路线
+
+### 第一步：回顾本周核心概念
 
 ```python
-"""
-Week 11 复盘：知识图谱 + 问题梳理 + 学习计划生成器
-"""
-from dataclasses import dataclass, field
-from typing import List, Dict, Set
-from collections import defaultdict
+# week_review.py
+"""Week 11 核心概念回顾"""
+
 import json
+from typing import Dict, List, Any
+from dataclasses import dataclass, field
 
-# ========== 1. 知识图谱 ==========
 
 @dataclass
-class KnowledgeNode:
-    """知识节点"""
-    name: str
-    description: str
+class ConceptSummary:
+    """概念摘要"""
     day: int
-    importance: str
-    mastery: str = "learning"
-    connections: List[str] = field(default_factory=list)
-    notes: str = ""
+    title: str
+    key_points: List[str]
+    code_examples: List[str]
+    tools: List[str]
+
+    def to_dict(self) -> dict:
+        return {
+            "day": self.day, "title": self.title,
+            "key_points": self.key_points,
+            "code_examples": self.code_examples,
+            "tools": self.tools,
+        }
 
 
-class KnowledgeGraph:
-    """知识图谱"""
+class Week11Review:
+    """Week 11 复盘"""
+
     def __init__(self):
-        self.nodes: Dict[str, KnowledgeNode] = {}
-    
-    def add_node(self, node: KnowledgeNode):
-        self.nodes[node.name] = node
-    
-    def add_connection(self, from_name: str, to_name: str):
-        if from_name in self.nodes:
-            self.nodes[from_name].connections.append(to_name)
-        if to_name in self.nodes:
-            self.nodes[to_name].connections.append(from_name)
-    
-    def get_by_day(self, day: int) -> List[KnowledgeNode]:
-        return [n for n in self.nodes.values() if n.day == day]
-    
-    def get_weak_areas(self) -> List[KnowledgeNode]:
-        return [n for n in self.nodes.values() if n.mastery == "learning"]
-    
-    def visualize(self) -> str:
-        """可视化知识图谱"""
-        graph = "知识图谱\n" + "=" * 50 + "\n\n"
-        
-        for day in range(1, 8):
-            nodes = self.get_by_day(day)
-            if nodes:
-                day_names = {1: "评估框架", 2: "行业基准", 3: "自动化Pipeline", 
-                            4: "可观测性", 5: "监控工具", 6: "迭代优化", 7: "复盘"}
-                graph += f"Day {day}: {day_names.get(day, '')}\n"
-                for node in nodes:
-                    status = {"learning": "●", "familiar": "◐", "mastered": "○"}
-                    graph += f"  {status[node.mastery]} {node.name}\n"
-                    if node.connections:
-                        graph += f"    → 关联: {', '.join(node.connections[:3])}\n"
-                graph += "\n"
-        
-        return graph
+        self.concepts = self._build_concept_map()
 
-
-def create_week11_graph() -> KnowledgeGraph:
-    """创建 Week 11 知识图谱"""
-    graph = KnowledgeGraph()
-    
-    # Day 1: 评估框架
-    graph.add_node(KnowledgeNode("评估指标", "核心评估维度", 1, "high", "mastered", ["任务完成率", "效率指标"]))
-    graph.add_node(KnowledgeNode("任务完成率", "任务完成度评估", 1, "high", "familiar"))
-    graph.add_node(KnowledgeNode("效率指标", "步骤效率和时间效率", 1, "medium", "familiar"))
-    graph.add_node(KnowledgeNode("安全性指标", "安全违规评估", 1, "medium", "learning"))
-    
-    # Day 2: 行业基准
-    graph.add_node(KnowledgeNode("SWE-bench", "软件工程基准", 2, "high", "familiar", ["HumanEval"]))
-    graph.add_node(KnowledgeNode("HumanEval", "代码生成基准", 2, "high", "familiar", ["pass@k"]))
-    graph.add_node(KnowledgeNode("GAIA", "通用AI助手基准", 2, "high", "learning"))
-    graph.add_node(KnowledgeNode("pass@k", "代码生成评测指标", 2, "medium", "familiar"))
-    
-    # Day 3: 自动化Pipeline
-    graph.add_node(KnowledgeNode("Pipeline架构", "模块化评估流程", 3, "high", "familiar", ["数据模块", "推理模块"]))
-    graph.add_node(KnowledgeNode("数据模块", "数据加载和预处理", 3, "medium", "mastered"))
-    graph.add_node(KnowledgeNode("推理模块", "模型推理封装", 3, "medium", "familiar"))
-    graph.add_node(KnowledgeNode("指标模块", "评估指标计算", 3, "medium", "mastered"))
-    
-    # Day 4: 可观测性
-    graph.add_node(KnowledgeNode("Traces", "分布式追踪", 4, "high", "familiar", ["Metrics", "Logs"]))
-    graph.add_node(KnowledgeNode("Metrics", "量化指标", 4, "high", "familiar"))
-    graph.add_node(KnowledgeNode("Logs", "结构化日志", 4, "high", "mastered"))
-    
-    # Day 5: 监控工具
-    graph.add_node(KnowledgeNode("LangSmith", "LangChain监控平台", 5, "high", "familiar", ["Arize Phoenix"]))
-    graph.add_node(KnowledgeNode("Arize Phoenix", "开源可观测性平台", 5, "high", "learning"))
-    
-    # Day 6: 迭代优化
-    graph.add_node(KnowledgeNode("Bad Case分析", "错误案例分析", 6, "high", "mastered", ["根因分析"]))
-    graph.add_node(KnowledgeNode("根因分析", "问题根本原因定位", 6, "high", "familiar"))
-    graph.add_node(KnowledgeNode("迭代优化", "评估-改进闭环", 6, "high", "familiar"))
-    
-    # 添加连接
-    connections = [
-        ("评估指标", "任务完成率"), ("评估指标", "效率指标"),
-        ("SWE-bench", "HumanEval"), ("HumanEval", "pass@k"),
-        ("Pipeline架构", "数据模块"), ("Pipeline架构", "推理模块"),
-        ("Traces", "Metrics"), ("Traces", "Logs"),
-        ("LangSmith", "Arize Phoenix"),
-        ("Bad Case分析", "根因分析"), ("根因分析", "迭代优化")
-    ]
-    for from_node, to_node in connections:
-        graph.add_connection(from_node, to_node)
-    
-    return graph
-
-
-# ========== 2. 问题梳理 ==========
-
-@dataclass
-class Problem:
-    """问题记录"""
-    id: int
-    day: int
-    category: str
-    question: str
-    solution: str
-    status: str
-
-
-def create_problem_list() -> List[Problem]:
-    """创建问题列表"""
-    problems = [
-        Problem(1, 1, "concept", "Agent 评估和传统 ML 评估有什么区别？",
-                "Agent 涉及多步交互、工具调用、环境反馈，需要更复杂的评估体系", "solved"),
-        Problem(2, 2, "concept", "pass@k 是怎么计算的？",
-                "pass@k = 1 - C(n-c, k) / C(n, k)，n是生成次数，c是成功次数", "solved"),
-        Problem(3, 3, "code", "Pipeline 如何支持并行评估？",
-                "使用多线程或异步处理，每个样本独立评估", "partial"),
-        Problem(4, 4, "concept", "Traces 和 Logs 有什么区别？",
-                "Traces 追踪请求完整路径，Logs 记录具体事件；Traces 是 Logs 的有序集合", "solved"),
-        Problem(5, 5, "tool", "LangSmith 和 Arize Phoenix 怎么选？",
-                "LangChain 生态用 LangSmith，需要漂移检测用 Arize Phoenix", "solved"),
-        Problem(6, 6, "code", "如何避免迭代优化陷入局部最优？",
-                "多样性探索，定期引入新数据，监控多个指标", "pending"),
-        Problem(7, 6, "concept", "评估指标之间冲突怎么办？",
-                "明确优先级，使用加权综合评分，进行 trade-off 分析", "solved"),
-    ]
-    return problems
-
-
-# ========== 3. 学习计划 ==========
-
-@dataclass
-class LearningTask:
-    """学习任务"""
-    task: str
-    priority: str
-    estimated_time: str
-    dependencies: List[str] = field(default_factory=list)
-
-
-class WeeklyPlanner:
-    """周计划生成器"""
-    
-    def __init__(self, knowledge_graph: KnowledgeGraph, problems: List[Problem]):
-        self.graph = knowledge_graph
-        self.problems = problems
-    
-    def analyze_weak_areas(self) -> List[str]:
-        """分析薄弱环节"""
-        weak_areas = []
-        for node in self.graph.get_weak_areas():
-            weak_areas.append(f"{node.name} ({node.day}天学习)")
-        return weak_areas
-    
-    def generate_tasks(self) -> List[LearningTask]:
-        """生成下周学习任务"""
-        tasks = []
-        
-        # 1. 巩固薄弱知识点
-        weak_nodes = self.graph.get_weak_areas()
-        for node in weak_nodes[:3]:
-            tasks.append(LearningTask(
-                task=f"深入学习 {node.name}",
-                priority="high",
-                estimated_time="2-3小时",
-                dependencies=[node.name]
-            ))
-        
-        # 2. 解决遗留问题
-        pending_problems = [p for p in self.problems if p.status == "pending"]
-        for problem in pending_problems[:2]:
-            tasks.append(LearningTask(
-                task=f"解决遗留问题: {problem.question[:30]}...",
-                priority="medium",
-                estimated_time="1-2小时"
-            ))
-        
-        # 3. 实践项目
-        tasks.append(LearningTask(
-            task="搭建完整的评估 Pipeline",
-            priority="high",
-            estimated_time="4-6小时",
-            dependencies=["Pipeline架构", "指标模块"]
-        ))
-        
-        tasks.append(LearningTask(
-            task="使用 LangSmith/Phoenix 监控 Agent",
-            priority="medium",
-            estimated_time="3-4小时",
-            dependencies=["LangSmith", "Arize Phoenix"]
-        ))
-        
-        return tasks
-    
-    def generate_week_plan(self) -> str:
-        """生成周计划"""
-        weak_areas = self.analyze_weak_areas()
-        tasks = self.generate_tasks()
-        
-        plan = f"""
-下周学习计划
-============
-
-本周薄弱环节:
-"""
-        for area in weak_areas:
-            plan += f"  - {area}\n"
-        
-        plan += "\n下周任务:"
-        for i, task in enumerate(tasks, 1):
-            plan += f"\n{i}. {task.task}"
-            plan += f"\n   优先级: {task.priority}"
-            plan += f"\n   预计时间: {task.estimated_time}"
-            if task.dependencies:
-                plan += f"\n   依赖: {', '.join(task.dependencies)}"
-            plan += "\n"
-        
-        plan += """
-每日安排建议:
-  周一: 巩固 Traces/Metrics/Logs
-  周二: 实践 LangSmith/Arize Phoenix
-  周三: 搭建评估 Pipeline
-  周四: Bad Case 分析实践
-  周五: 迭代优化实践
-  周六: 项目整合
-  周日: 本周复盘 + 下周规划
-"""
-        
-        return plan
-
-
-# ========== 4. 自我评估 ==========
-
-def create_self_assessment() -> Dict:
-    """创建自我评估"""
-    assessment = {
-        "知识掌握度": {
-            "评估指标体系": "familiar",
-            "行业基准测试": "familiar",
-            "自动化Pipeline": "familiar",
-            "可观测性三支柱": "familiar",
-            "监控工具使用": "learning",
-            "迭代优化方法": "familiar"
-        },
-        "技能掌握度": {
-            "设计评估框架": "familiar",
-            "实现Pipeline": "familiar",
-            "Bad Case分析": "mastered",
-            "使用LangSmith": "learning",
-            "使用Arize Phoenix": "learning"
-        },
-        "本周收获": [
-            "建立了系统化的评估思维",
-            "掌握了三大可观测性支柱",
-            "学会了用评估驱动迭代优化",
-            "了解了行业主流基准测试"
-        ],
-        "遗留问题": [
-            "Pipeline并行化还需要实践",
-            "LangSmith/Arize Phoenix的高级功能",
-            "迭代优化避免局部最优的方法"
-        ],
-        "下周重点": [
-            "深入实践监控工具",
-            "搭建完整的评估体系",
-            "实践迭代优化流程"
+    def _build_concept_map(self) -> List[ConceptSummary]:
+        """构建概念图"""
+        return [
+            ConceptSummary(
+                day=1, title="Agent 评估框架",
+                key_points=[
+                    "四大评估维度：准确性、延迟、成本、安全性",
+                    "评估量表（Rubric）：结构化评分标准",
+                    "测试套件（Test Suite）：自动化评估",
+                ],
+                code_examples=["eval_dimensions.py", "rubric.py", "test_agent_eval.py"],
+                tools=["pytest", "dataclasses"],
+            ),
+            ConceptSummary(
+                day=2, title="业界基准测试",
+                key_points=[
+                    "SWE-bench：真实软件工程问题",
+                    "HumanEval：代码生成能力",
+                    "GAIA：综合推理能力",
+                    "MMLU：知识理解广度",
+                ],
+                code_examples=["swe_bench_intro.py", "humaneval_intro.py", "run_benchmark.py"],
+                tools=["datasets", "pytest"],
+            ),
+            ConceptSummary(
+                day=3, title="自动化评估流水线",
+                key_points=[
+                    "pytest 评估流水线",
+                    "LLM-as-Judge 模式",
+                    "回归测试机制",
+                ],
+                code_examples=["eval_pipeline.py", "llm_judge.py", "test_eval_pipeline.py"],
+                tools=["pytest", "openai"],
+            ),
+            ConceptSummary(
+                day=4, title="可观测性",
+                key_points=[
+                    "三大支柱：Traces、Metrics、Logs",
+                    "OpenTelemetry 集成",
+                    "监控仪表板设计",
+                ],
+                code_examples=["observability_basics.py", "opentelemetry_integration.py", "dashboard.py"],
+                tools=["opentelemetry", "psutil"],
+            ),
+            ConceptSummary(
+                day=5, title="LangSmith / Arize Phoenix",
+                key_points=[
+                    "LangSmith 追踪设置",
+                    "Arize Phoenix 部署",
+                    "完整仪表化 Agent",
+                ],
+                code_examples=["langsmith_setup.py", "phoenix_setup.py", "instrumented_agent.py"],
+                tools=["langsmith", "arize-phoenix"],
+            ),
+            ConceptSummary(
+                day=6, title="评估驱动迭代",
+                key_points=[
+                    "评估结果分析",
+                    "A/B 测试框架",
+                    "反馈循环系统",
+                ],
+                code_examples=["eval_analysis.py", "ab_testing.py", "feedback_loop.py"],
+                tools=["pandas", "numpy"],
+            ),
         ]
-    }
-    return assessment
 
+    def print_overview(self):
+        """打印本周概览"""
+        print("=" * 70)
+        print("Week 11: Agent 评估 — 完整回顾")
+        print("=" * 70)
+        print()
+        for concept in self.concepts:
+            print(f"Day {concept.day}: {concept.title}")
+            print("-" * 50)
+            for point in concept.key_points:
+                print(f"  - {point}")
+            print(f"  代码示例: {', '.join(concept.code_examples)}")
+            print(f"  工具: {', '.join(concept.tools)}")
+            print()
 
-# ========== 5. 主函数 ==========
+    def get_all_tools(self) -> List[str]:
+        """获取所有工具"""
+        tools = set()
+        for concept in self.concepts:
+            tools.update(concept.tools)
+        return sorted(tools)
 
-def main():
-    """复盘主函数"""
-    print("=" * 60)
-    print("Week 11 复盘")
-    print("=" * 60)
-    
-    # 1. 创建知识图谱
-    print("\n1. 知识图谱")
-    graph = create_week11_graph()
-    print(graph.visualize())
-    
-    # 2. 问题梳理
-    print("\n2. 问题梳理")
-    problems = create_problem_list()
-    solved = sum(1 for p in problems if p.status == "solved")
-    print(f"   总问题数: {len(problems)}")
-    print(f"   已解决: {solved}")
-    print(f"   待解决: {len(problems) - solved}")
-    
-    print("\n   问题列表:")
-    for p in problems:
-        status_icon = "✓" if p.status == "solved" else "○"
-        print(f"   {status_icon} [{p.day}天] {p.question}")
-    
-    # 3. 自我评估
-    print("\n3. 自我评估")
-    assessment = create_self_assessment()
-    
-    print("\n   知识掌握度:")
-    for topic, level in assessment["知识掌握度"].items():
-        print(f"     {topic}: {level}")
-    
-    print("\n   技能掌握度:")
-    for skill, level in assessment["技能掌握度"].items():
-        print(f"     {skill}: {level}")
-    
-    print("\n   本周收获:")
-    for收获 in assessment["本周收获"]:
-        print(f"     + {收获}")
-    
-    print("\n   遗留问题:")
-    for问题 in assessment["遗留问题"]:
-        print(f"     ? {问题}")
-    
-    # 4. 生成下周计划
-    print("\n4. 下周计划")
-    planner = WeeklyPlanner(graph, problems)
-    plan = planner.generate_week_plan()
-    print(plan)
-    
-    # 5. 保存复盘
-    print("\n5. 复盘保存")
-    recap = {
-        "week": 11,
-        "topic": "评估框架",
-        "knowledge_graph": {
-            "nodes": len(graph.nodes),
-            "weak_areas": [n.name for n in graph.get_weak_areas()]
-        },
-        "problems": {
-            "total": len(problems),
-            "solved": solved
-        },
-        "assessment": assessment
-    }
-    
-    print(f"   复盘数据已准备就绪")
-    print(f"   可保存为: week11_recap.json")
-    
-    print("\n" + "=" * 60)
-    print("Week 11 复盘完成！")
-    print("=" * 60)
-    
-    return recap
+    def get_all_code_examples(self) -> List[str]:
+        """获取所有代码示例"""
+        examples = []
+        for concept in self.concepts:
+            examples.extend(concept.code_examples)
+        return examples
+
+    def export_review(self, filepath: str):
+        """导出复盘内容"""
+        data = {
+            "week": 11,
+            "theme": "Agent 评估",
+            "concepts": [c.to_dict() for c in self.concepts],
+            "all_tools": self.get_all_tools(),
+            "all_code_examples": self.get_all_code_examples(),
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"复盘内容已导出到: {filepath}")
 
 
 if __name__ == "__main__":
-    recap = main()
+    review = Week11Review()
+    review.print_overview()
+
+    print("\n本周使用的工具:")
+    for tool in review.get_all_tools():
+        print(f"  - {tool}")
+
+    print(f"\n代码示例总数: {len(review.get_all_code_examples())}")
+
+    review.export_review("week11_review.json")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 不知道从哪里开始复盘 | 按时间顺序回顾每天内容 |
-| 2 | 知识点太多记不住 | 用思维导图整理，抓核心 |
-| 3 | 遗留问题太多 | 按优先级排序，先解决关键问题 |
-| 4 | 下周计划太满 | 聚焦 3 个核心任务，其他作为备选 |
-| 5 | 感觉没学到东西 | 列出具体代码和成果，量化学习效果 |
+### 第二步：构建评估清单
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| 复盘 | 回顾总结，发现改进机会 |
-| 知识图谱 | 可视化知识点及其关联 |
-| 掌握程度 | learning → familiar → mastered |
-| Bad Case | 模型预测错误的案例 |
-| 迭代优化 | 评估-分析-改进的循环 |
-| 闭环流程 | 从评估到改进的完整循环 |
+```python
+# eval_checklist.py
+"""Agent 评估检查表"""
 
-## ✅ 验收清单
-- [ ] 完成知识图谱绘制
-- [ ] 整理本周所有问题和解法
-- [ ] 完成自我评估
-- [ ] 制定下周学习计划
-- [ ] 复盘文档保存完毕
+import json
+from typing import Dict, List, Any
+from dataclasses import dataclass, field
+from enum import Enum
 
-## 📝 复盘小纸条
-- 今天最大的收获: 完成了 Week 11 的系统复盘，建立了评估框架的完整认知
-- 还不太确定的: LangSmith/Arize Phoenix 的高级功能
 
-## 📥 明日同步接口
-- 今日完成度: 100%
-- 卡点描述: 无
-- 代码是否能跑通: 是
-- 明天希望: 开始 Week 12 生产部署的学习
+class ChecklistStatus(Enum):
+    """检查项状态"""
+    DONE = "done"
+    PARTIAL = "partial"
+    TODO = "todo"
+    NA = "na"
+
+
+@dataclass
+class ChecklistItem:
+    """检查项"""
+    id: str
+    category: str
+    name: str
+    description: str
+    status: ChecklistStatus = ChecklistStatus.TODO
+    notes: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "category": self.category,
+            "name": self.name, "description": self.description,
+            "status": self.status.value, "notes": self.notes,
+        }
+
+
+class AgentEvalChecklist:
+    """Agent 评估检查表"""
+
+    def __init__(self, agent_name: str):
+        self.agent_name = agent_name
+        self.items: List[ChecklistItem] = []
+        self._build_checklist()
+
+    def _build_checklist(self):
+        """构建检查表"""
+        items = [
+            # 评估框架
+            ChecklistItem("EF01", "评估框架", "定义评估维度",
+                         "明确定义准确性、延迟、成本、安全性等维度"),
+            ChecklistItem("EF02", "评估框架", "设计评估量表",
+                         "为每个维度设计结构化的评分标准"),
+            ChecklistItem("EF03", "评估框架", "创建测试数据集",
+                         "准备足够数量和多样性的测试用例"),
+
+            # 基准测试
+            ChecklistItem("BT01", "基准测试", "选择合适的基准",
+                         "根据 Agent 场景选择 SWE-bench/HumanEval/GAIA/MMLU"),
+            ChecklistItem("BT02", "基准测试", "运行基准测试",
+                         "使用标准工具运行基准测试"),
+            ChecklistItem("BT03", "基准测试", "解读结果",
+                         "理解各指标的含义和局限性"),
+
+            # 自动化流水线
+            ChecklistItem("AP01", "自动化流水线", "构建 pytest 流水线",
+                         "用 pytest 组织评估测试"),
+            ChecklistItem("AP02", "自动化流水线", "实现 LLM-as-Judge",
+                         "让 LLM 评估 LLM 的输出"),
+            ChecklistItem("AP03", "自动化流水线", "建立回归测试",
+                         "确保改进不引入新问题"),
+
+            # 可观测性
+            ChecklistItem("OB01", "可观测性", "实现 Tracing",
+                         "为 Agent 添加追踪功能"),
+            ChecklistItem("OB02", "可观测性", "收集 Metrics",
+                         "记录关键性能指标"),
+            ChecklistItem("OB03", "可观测性", "结构化 Logging",
+                         "实现结构化日志记录"),
+
+            # 工具集成
+            ChecklistItem("TI01", "工具集成", "配置 LangSmith",
+                         "设置 LangSmith 追踪"),
+            ChecklistItem("TI02", "工具集成", "部署 Phoenix",
+                         "部署 Arize Phoenix 可观测性"),
+
+            # 迭代优化
+            ChecklistItem("IO01", "迭代优化", "分析评估结果",
+                         "从数据中发现问题"),
+            ChecklistItem("IO02", "迭代优化", "实施 A/B 测试",
+                         "对比不同版本的表现"),
+            ChecklistItem("IO03", "迭代优化", "建立反馈循环",
+                         "收集和整合反馈"),
+        ]
+        self.items = items
+
+    def update_status(self, item_id: str, status: ChecklistStatus, notes: str = ""):
+        """更新检查项状态"""
+        for item in self.items:
+            if item.id == item_id:
+                item.status = status
+                if notes:
+                    item.notes = notes
+                break
+
+    def get_progress(self) -> Dict[str, Any]:
+        """获取进度"""
+        total = len(self.items)
+        done = sum(1 for i in self.items if i.status == ChecklistStatus.DONE)
+        partial = sum(1 for i in self.items if i.status == ChecklistStatus.PARTIAL)
+        todo = sum(1 for i in self.items if i.status == ChecklistStatus.TODO)
+
+        # 按类别统计
+        by_category = {}
+        for item in self.items:
+            if item.category not in by_category:
+                by_category[item.category] = {"total": 0, "done": 0}
+            by_category[item.category]["total"] += 1
+            if item.status == ChecklistStatus.DONE:
+                by_category[item.category]["done"] += 1
+
+        return {
+            "total_items": total,
+            "done": done, "partial": partial, "todo": todo,
+            "completion_rate": round(done / total, 4) if total > 0 else 0,
+            "by_category": by_category,
+        }
+
+    def get_pending_items(self) -> List[Dict]:
+        """获取待办项"""
+        return [i.to_dict() for i in self.items if i.status != ChecklistStatus.DONE]
+
+    def print_checklist(self):
+        """打印检查表"""
+        print(f"\nAgent 评估检查表: {self.agent_name}")
+        print("=" * 70)
+
+        current_category = ""
+        for item in self.items:
+            if item.category != current_category:
+                current_category = item.category
+                print(f"\n{current_category}:")
+                print("-" * 50)
+
+            status_icon = {
+                ChecklistStatus.DONE: "[x]",
+                ChecklistStatus.PARTIAL: "[~]",
+                ChecklistStatus.TODO: "[ ]",
+                ChecklistStatus.NA: "[-]",
+            }[item.status]
+
+            print(f"  {status_icon} {item.id}: {item.name}")
+            print(f"       {item.description}")
+            if item.notes:
+                print(f"       备注: {item.notes}")
+
+        progress = self.get_progress()
+        print(f"\n进度: {progress['done']}/{progress['total_items']} "
+              f"({progress['completion_rate']*100:.1f}%)")
+
+    def export_checklist(self, filepath: str):
+        """导出检查表"""
+        data = {
+            "agent_name": self.agent_name,
+            "items": [i.to_dict() for i in self.items],
+            "progress": self.get_progress(),
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"检查表已导出到: {filepath}")
+
+
+if __name__ == "__main__":
+    checklist = AgentEvalChecklist("我的 Agent")
+
+    # 模拟完成一些项目
+    checklist.update_status("EF01", ChecklistStatus.DONE, "已完成")
+    checklist.update_status("EF02", ChecklistStatus.DONE, "已完成")
+    checklist.update_status("EF03", ChecklistStatus.PARTIAL, "部分完成")
+    checklist.update_status("BT01", ChecklistStatus.DONE, "选择 HumanEval")
+    checklist.update_status("AP01", ChecklistStatus.DONE, "pytest 流水线已搭建")
+
+    checklist.print_checklist()
+
+    print("\n待办项:")
+    for item in checklist.get_pending_items()[:5]:
+        print(f"  - {item['id']}: {item['name']}")
+
+    checklist.export_checklist("eval_checklist.json")
+```
+
+### 第三步：自我评估
+
+```python
+# self_assessment.py
+"""自我评估系统"""
+
+import json
+from typing import Dict, List, Any
+from dataclasses import dataclass, field
+
+
+@dataclass
+class AssessmentQuestion:
+    """评估问题"""
+    question_id: str
+    category: str
+    question: str
+    options: List[str]
+    correct_answer: int  # 正确答案索引
+    explanation: str
+
+    def to_dict(self) -> dict:
+        return {
+            "question_id": self.question_id,
+            "category": self.category,
+            "question": self.question,
+            "options": self.options,
+            "explanation": self.explanation,
+        }
+
+
+class SelfAssessment:
+    """自我评估系统"""
+
+    def __init__(self):
+        self.questions = self._build_questions()
+        self.answers: Dict[str, int] = {}
+        self.score = 0
+
+    def _build_questions(self) -> List[AssessmentQuestion]:
+        """构建评估问题"""
+        return [
+            AssessmentQuestion(
+                "Q01", "评估框架",
+                "以下哪个不是 Agent 评估的核心维度？",
+                ["准确性", "延迟", "美观度", "安全性"],
+                2, "美观度不是评估 Agent 的核心维度。"),
+            AssessmentQuestion(
+                "Q02", "评估框架",
+                "评估量表（Rubric）的主要作用是什么？",
+                ["记录日志", "提供结构化评分标准", "运行测试", "部署模型"],
+                1, "评估量表提供结构化的评分标准。"),
+            AssessmentQuestion(
+                "Q03", "基准测试",
+                "SWE-bench 主要评估什么能力？",
+                ["知识广度", "代码生成", "软件工程问题解决", "多轮对话"],
+                2, "SWE-bench 评估解决真实软件工程问题的能力。"),
+            AssessmentQuestion(
+                "Q04", "自动化流水线",
+                "LLM-as-Judge 模式是什么？",
+                ["用 LLM 生成测试用例", "用 LLM 评估 LLM 输出",
+                 "用 LLM 运行测试", "用 LLM 部署模型"],
+                1, "LLM-as-Judge 是用 LLM 来评估 LLM 的输出。"),
+            AssessmentQuestion(
+                "Q05", "可观测性",
+                "可观测性的三大支柱是什么？",
+                ["CPU、内存、磁盘", "Traces、Metrics、Logs",
+                 "输入、处理、输出", "开发、测试、部署"],
+                1, "Traces、Metrics、Logs 是可观测性的三大支柱。"),
+            AssessmentQuestion(
+                "Q06", "可观测性",
+                "OpenTelemetry 的主要作用是什么？",
+                ["运行 LLM", "提供标准化的可观测性框架",
+                 "生成报告", "管理用户"],
+                1, "OpenTelemetry 提供标准化的可观测性框架。"),
+            AssessmentQuestion(
+                "Q07", "工具集成",
+                "LangSmith 是什么类型的工具？",
+                ["代码编辑器", "LLM 追踪平台", "数据库", "Web 服务器"],
+                1, "LangSmith 是 LangChain 的 LLM 追踪平台。"),
+            AssessmentQuestion(
+                "Q08", "迭代优化",
+                "A/B 测试的主要目的是什么？",
+                ["记录日志", "对比不同版本的表现", "运行基准测试", "部署模型"],
+                1, "A/B 测试用于对比不同版本的表现。"),
+            AssessmentQuestion(
+                "Q09", "迭代优化",
+                "反馈循环的正确顺序是什么？",
+                ["评估-改进-分析-再评估", "分析-评估-改进-再评估",
+                 "评估-分析-改进-再评估", "改进-评估-分析-再评估"],
+                2, "正确顺序是：评估-分析-改进-再评估。"),
+            AssessmentQuestion(
+                "Q10", "综合",
+                "以下哪个不是评估驱动迭代的步骤？",
+                ["收集评估数据", "分析失败模式", "直接修改代码", "验证改进效果"],
+                2, "应该先分析再改进，而不是直接修改代码。"),
+        ]
+
+    def answer_question(self, question_id: str, answer_index: int):
+        """回答问题"""
+        self.answers[question_id] = answer_index
+
+    def calculate_score(self) -> Dict[str, Any]:
+        """计算分数"""
+        total = len(self.questions)
+        correct = 0
+        details = []
+
+        for q in self.questions:
+            user_answer = self.answers.get(q.question_id, -1)
+            is_correct = user_answer == q.correct_answer
+            if is_correct:
+                correct += 1
+
+            details.append({
+                "question_id": q.question_id,
+                "correct": is_correct,
+                "user_answer": user_answer,
+                "correct_answer": q.correct_answer,
+                "explanation": q.explanation,
+            })
+
+        score = round(correct / total, 4) if total > 0 else 0
+        self.score = score
+
+        # 评估等级
+        if score >= 0.9:
+            level = "优秀"
+            comment = "你对评估框架有深入的理解！"
+        elif score >= 0.7:
+            level = "良好"
+            comment = "基础扎实，建议深入学习高级主题。"
+        elif score >= 0.5:
+            level = "一般"
+            comment = "建议回顾本周内容，加强实践。"
+        else:
+            level = "需努力"
+            comment = "建议从基础开始重新学习。"
+
+        return {
+            "total_questions": total,
+            "correct_answers": correct,
+            "score": score,
+            "level": level,
+            "comment": comment,
+            "details": details,
+        }
+
+    def run_assessment(self) -> Dict:
+        """运行自我评估"""
+        print("Agent 评估方法论 - 自我评估")
+        print("=" * 60)
+
+        # 模拟回答（实际使用时应由用户输入）
+        import random
+        for q in self.questions:
+            # 模拟用户回答（70% 概率正确）
+            if random.random() < 0.7:
+                self.answer_question(q.question_id, q.correct_answer)
+            else:
+                wrong = [i for i in range(len(q.options)) if i != q.correct_answer]
+                self.answer_question(q.question_id, random.choice(wrong))
+
+        result = self.calculate_score()
+
+        print(f"\n评估结果:")
+        print(f"  总题数: {result['total_questions']}")
+        print(f"  正确数: {result['correct_answers']}")
+        print(f"  得分: {result['score']*100:.1f}%")
+        print(f"  等级: {result['level']}")
+        print(f"  评语: {result['comment']}")
+
+        print(f"\n详细结果:")
+        for detail in result["details"]:
+            status = "正确" if detail["correct"] else "错误"
+            print(f"  {detail['question_id']}: {status}")
+            if not detail["correct"]:
+                print(f"    你的答案: {detail['user_answer']}")
+                print(f"    正确答案: {detail['correct_answer']}")
+                print(f"    解释: {detail['explanation']}")
+
+        return result
+
+    def export_result(self, filepath: str, result: Dict):
+        """导出评估结果"""
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"\n评估结果已导出到: {filepath}")
+
+
+if __name__ == "__main__":
+    assessment = SelfAssessment()
+    result = assessment.run_assessment()
+    assessment.export_result("self_assessment_result.json", result)
+```
+
+---
+
+## 预期输出
+
+### 运行本周回顾
+
+```bash
+python week_review.py
+```
+
+```
+======================================================================
+Week 11: Agent 评估 — 完整回顾
+======================================================================
+
+Day 1: Agent 评估框架
+--------------------------------------------------
+  - 四大评估维度：准确性、延迟、成本、安全性
+  - 评估量表（Rubric）：结构化评分标准
+  - 测试套件（Test Suite）：自动化评估
+  代码示例: eval_dimensions.py, rubric.py, test_agent_eval.py
+  工具: pytest, dataclasses
+
+Day 2: 业界基准测试
+--------------------------------------------------
+  - SWE-bench：真实软件工程问题
+  - HumanEval：代码生成能力
+  - GAIA：综合推理能力
+  - MMLU：知识理解广度
+  ...
+
+本周使用的工具:
+  - arize-phoenix
+  - datasets
+  - langsmith
+  - numpy
+  - opentelemetry
+  - pandas
+  - psutil
+  - pytest
+
+代码示例总数: 18
+```
+
+### 运行评估检查表
+
+```bash
+python eval_checklist.py
+```
+
+```
+Agent 评估检查表: 我的 Agent
+======================================================================
+
+评估框架:
+--------------------------------------------------
+  [x] EF01: 定义评估维度
+  [x] EF02: 设计评估量表
+  [~] EF03: 创建测试数据集
+       备注: 部分完成
+
+基准测试:
+--------------------------------------------------
+  [x] BT01: 选择合适的基准
+  [ ] BT02: 运行基准测试
+  [ ] BT03: 解读结果
+
+进度: 4/16 (25.0%)
+```
+
+### 运行自我评估
+
+```bash
+python self_assessment.py
+```
+
+```
+Agent 评估方法论 - 自我评估
+============================================================
+
+评估结果:
+  总题数: 10
+  正确数: 7
+  得分: 70.0%
+  等级: 良好
+  评语: 基础扎实，建议深入学习高级主题。
+
+详细结果:
+  Q01: 正确
+  Q02: 正确
+  Q03: 正确
+  Q04: 错误
+    你的答案: 0
+    正确答案: 1
+    解释: LLM-as-Judge 是用 LLM 来评估 LLM 的输出。
+  ...
+```
+
+---
+
+## 常见错误及解决方案
+
+### 错误 1: 评估问题理解不清
+
+**解决方案：** 仔细阅读问题和选项，理解每个概念的定义。
+
+### 错误 2: 检查表项目遗漏
+
+**解决方案：** 参考本周内容，确保覆盖所有关键点。
+
+---
+
+## 每日挑战
+
+### 挑战 1: 完善评估清单
+
+根据你的具体项目，添加更多自定义的检查项。
+
+### 挑战 2: 创建评估模板
+
+为你的团队创建一个可复用的 Agent 评估模板。
+
+### 挑战 3: 规划下一步
+
+基于评估结果，规划下一周的学习和改进方向。
+
+---
+
+## 本周小结
+
+Week 11 我们系统学习了 Agent 评估：
+
+### 核心知识点
+
+| 日期 | 主题 | 核心内容 |
+|------|------|----------|
+| Day 1 | 评估框架 | 四大维度、Rubric、测试套件 |
+| Day 2 | 基准测试 | SWE-bench、HumanEval、GAIA、MMLU |
+| Day 3 | 自动化流水线 | pytest、LLM-as-Judge、回归测试 |
+| Day 4 | 可观测性 | Traces、Metrics、Logs、OpenTelemetry |
+| Day 5 | 工具集成 | LangSmith、Arize Phoenix |
+| Day 6 | 迭代优化 | 分析、A/B 测试、反馈循环 |
+
+### 关键公式
+
+```
+评估得分 = sum(权重 x 标准化分数)
+
+通过率 = 通过数 / 总数
+
+改进幅度 = (新指标 - 旧指标) / 旧指标
+```
+
+### 工具清单
+
+- **评估**: pytest, pandas, numpy
+- **基准测试**: datasets, openai
+- **可观测性**: opentelemetry, langsmith, arize-phoenix
+- **分析**: tabulate, matplotlib
+
+### 下周预告
+
+Week 12 我们将学习 Agent 的部署与运维，包括：
+
+- Docker 容器化部署
+- Kubernetes 编排
+- CI/CD 流水线
+- 生产环境监控
+
+---
+
+*恭喜你完成了 Week 11 的学习！评估是持续改进的基础，希望你能在实际项目中应用这些知识。*
+
+*下周见！*

@@ -1,55 +1,73 @@
-# 📅 Week 3 Day 5："When NOT to build agents" 判断框架
+# Day 5: "When NOT to build agents" 判断框架
 
-## 🧭 今日方向
-> 今天我们将学习一个重要但常被忽视的话题：什么时候不应该构建 Agent。了解这个判断框架能避免过度设计。
+## 今日学习目标
 
-## 🎯 生活比喻
-> 就像不是所有问题都需要用锤子解决一样，不是所有任务都需要 Agent。有时候简单的管道脚本比复杂的 Agent 更合适。
-
-## 📋 今日三件事
 1. 理解 Agent 的适用场景
 2. 学习判断框架和决策树
-3. 分析实际案例
+3. 分析成功和失败的案例
+4. 了解常见的替代方案
+5. 建立理性决策的思维方式
 
-## 🗺️ 手把手路线
+---
 
-### Step 1: Agent 适用性分析
-- **做什么**: 了解什么任务适合用 Agent 解决
-- **为什么**: 避免在不需要 Agent 的场景中使用
-- **成功标志**: 能判断任务是否需要 Agent
+## 第一部分：为什么需要这个框架？
 
-### Step 2: 判断框架
-- **做什么**: 学习系统的判断方法
-- **为什么**: 有框架才能做出理性决策
-- **成功标志**: 能使用框架分析具体场景
+### 问题：过度使用 Agent
 
-### Step 3: 案例分析
-- **做什么**: 分析成功和失败的 Agent 案例
-- **为什么**: 从实际案例中学习
-- **成功标志**: 能总结经验教训
+```
+常见错误：
+1. 简单的脚本任务 → 用 Agent（过度设计）
+2. 固定的 API 调用 → 用 Agent（不需要灵活性）
+3. 确定性的数据转换 → 用 Agent（增加成本）
 
-## 💻 代码区
+后果：
+- 增加复杂性
+- 提高成本
+- 降低可靠性
+- 增加维护难度
+```
+
+### 正确的思维方式
+
+```
+不是："这个任务能用 Agent 吗？"
+而是："这个任务需要 Agent 吗？"
+
+不是："Agent 能做什么？"
+而是："什么方案最适合这个任务？"
+```
+
+---
+
+## 第二部分：判断框架
+
+### 文件：app/agent_framework/decision.py
 
 ```python
-# Agent 适用性判断框架
+"""
+Agent 决策框架
+"""
 
 from dataclasses import dataclass
 from typing import List, Dict, Optional
 from enum import Enum
 
+
 class TaskComplexity(str, Enum):
     """任务复杂度"""
-    SIMPLE = "simple"      # 简单
-    MODERATE = "moderate"   # 中等
-    COMPLEX = "complex"     # 复杂
+    SIMPLE = "simple"          # 简单
+    MODERATE = "moderate"      # 中等
+    COMPLEX = "complex"        # 复杂
     VERY_COMPLEX = "very_complex"  # 非常复杂
+
 
 class TaskType(str, Enum):
     """任务类型"""
-    DETERMINISTIC = "deterministic"  # 确定性
-    CREATIVE = "creative"            # 创造性
-    ANALYTICAL = "analytical"        # 分析性
-    INTERACTIVE = "interactive"      # 交互性
+    DETERMINISTIC = "deterministic"    # 确定性
+    CREATIVE = "creative"              # 创造性
+    ANALYTICAL = "analytical"          # 分析性
+    INTERACTIVE = "interactive"        # 交互性
+
 
 class DecisionFactor(str, Enum):
     """决策因素"""
@@ -59,6 +77,7 @@ class DecisionFactor(str, Enum):
     USER_INTERACTION = "user_interaction"
     ERROR_TOLERANCE = "error_tolerance"
     COST_SENSITIVITY = "cost_sensitivity"
+
 
 @dataclass
 class TaskAnalysis:
@@ -73,6 +92,7 @@ class TaskAnalysis:
     error_tolerance: float  # 0-1 (越高越能容忍错误)
     cost_sensitivity: float  # 0-1 (越高越敏感)
 
+
 @dataclass
 class Recommendation:
     """推荐方案"""
@@ -81,6 +101,7 @@ class Recommendation:
     reason: str
     alternatives: List[str]
     risk_factors: List[str]
+
 
 class AgentDecisionFramework:
     """Agent 决策框架"""
@@ -94,7 +115,7 @@ class AgentDecisionFramework:
         
         Args:
             task: 任务分析
-            
+        
         Returns:
             推荐方案
         """
@@ -120,7 +141,7 @@ class AgentDecisionFramework:
             DecisionFactor.TOOL_DEPENDENCY: task.tool_dependency,
             DecisionFactor.USER_INTERACTION: task.user_interaction,
             DecisionFactor.ERROR_TOLERANCE: task.error_tolerance,
-            DecisionFactor.COST_SENSITIVITY: 1 - task.cost_sensitivity,  # 成本敏感度越低越好
+            DecisionFactor.COST_SENSITIVITY: 1 - task.cost_sensitivity,
         }
         
         # 加权平均
@@ -193,6 +214,7 @@ class AgentDecisionFramework:
             risk_factors=[]
         )
 
+
 # 使用示例
 if __name__ == "__main__":
     framework = AgentDecisionFramework()
@@ -238,36 +260,44 @@ if __name__ == "__main__":
     print(f"  替代方案: {', '.join(recommendation2.alternatives)}")
 ```
 
+---
+
+## 第三部分：决策树和检查清单
+
+### 文件：app/agent_framework/checklist.py
+
 ```python
-# 决策树和检查清单
+"""
+决策树和检查清单
+"""
 
 DECISION_TREE = """
 Agent 决策树
 ===========
 
 开始
-  │
-  ├─ 任务是否需要推理？
-  │   ├─ 否 → 使用简单脚本/规则
-  │   └─ 是 ↓
-  │
-  ├─ 任务是否需要多步骤？
-  │   ├─ 否 → 使用单步 API 调用
-  │   └─ 是 ↓
-  │
-  ├─ 任务是否需要工具使用？
-  │   ├─ 否 → 使用纯 LLM 调用
-  │   └─ 是 ↓
-  │
-  ├─ 任务是否有不确定性？
-  │   ├─ 否 → 使用确定性算法
-  │   └─ 是 ↓
-  │
-  ├─ 任务是否需要用户交互？
-  │   ├─ 否 → 使用批处理 Agent
-  │   └─ 是 ↓
-  │
-  └─ 使用交互式 Agent
+  |
+  +-- 任务是否需要推理？
+  |   +-- 否 -> 使用简单脚本/规则
+  |   +-- 是 -> |
+  |
+  +-- 任务是否需要多步骤？
+  |   +-- 否 -> 使用单步 API 调用
+  |   +-- 是 -> |
+  |
+  +-- 任务是否需要工具使用？
+  |   +-- 否 -> 使用纯 LLM 调用
+  |   +-- 是 -> |
+  |
+  +-- 任务是否有不确定性？
+  |   +-- 否 -> 使用确定性算法
+  |   +-- 是 -> |
+  |
+  +-- 任务是否需要用户交互？
+  |   +-- 否 -> 使用批处理 Agent
+  |   +-- 是 -> |
+  |
+  +-- 使用交互式 Agent
 """
 
 CHECKLIST = """
@@ -276,31 +306,31 @@ Agent 使用检查清单
 
 在决定使用 Agent 之前，请回答以下问题：
 
-□ 任务是否需要推理能力？
+[ ] 任务是否需要推理能力？
   - 是：需要理解上下文、做出判断
   - 否：简单的规则匹配即可
 
-□ 任务是否涉及多个步骤？
+[ ] 任务是否涉及多个步骤？
   - 是：需要编排多个操作
   - 否：单步完成
 
-□ 任务是否需要使用外部工具？
+[ ] 任务是否需要使用外部工具？
   - 是：需要调用 API、查询数据库等
   - 否：纯文本处理
 
-□ 任务是否有不确定性？
+[ ] 任务是否有不确定性？
   - 是：输入变化大，需要动态处理
   - 否：输入格式固定
 
-□ 任务是否需要错误处理？
+[ ] 任务是否需要错误处理？
   - 是：可能失败，需要重试或回退
   - 否：总能成功
 
-□ 任务的错误容忍度如何？
+[ ] 任务的错误容忍度如何？
   - 高：可以接受偶尔错误
   - 低：必须保证准确性
 
-□ 任务的成本敏感度如何？
+[ ] 任务的成本敏感度如何？
   - 高：需要控制 API 调用成本
   - 低：成本不是主要考虑
 
@@ -347,18 +377,28 @@ print(CHECKLIST)
 print(ALTERNATIVES)
 ```
 
+---
+
+## 第四部分：案例分析
+
+### 文件：app/agent_framework/cases.py
+
 ```python
-# 实际案例分析
+"""
+案例分析
+"""
 
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List
 from enum import Enum
+
 
 class CaseOutcome(str, Enum):
     """案例结果"""
     SUCCESS = "success"
     FAILURE = "failure"
     PARTIAL = "partial"
+
 
 @dataclass
 class CaseStudy:
@@ -369,6 +409,8 @@ class CaseStudy:
     outcome: CaseOutcome
     lessons_learned: List[str]
     recommendation: str
+    alternative_solution: str
+
 
 # 案例数据库
 CASE_STUDIES = [
@@ -382,7 +424,8 @@ CASE_STUDIES = [
             "需要良好的知识库支持",
             "人工介入机制很重要"
         ],
-        recommendation="适合使用 Agent，但需要完善的回退机制"
+        recommendation="适合使用 Agent，但需要完善的回退机制",
+        alternative_solution="简单问答可用规则引擎"
     ),
     CaseStudy(
         name="数据格式转换",
@@ -394,7 +437,8 @@ CASE_STUDIES = [
             "脚本更简单、更可靠、成本更低",
             "过度设计导致维护困难"
         ],
-        recommendation="不建议使用 Agent，简单的 Python 脚本即可"
+        recommendation="不建议使用 Agent，简单的 Python 脚本即可",
+        alternative_solution="使用 pandas 或 csv 模块"
     ),
     CaseStudy(
         name="代码审查助手",
@@ -406,7 +450,8 @@ CASE_STUDIES = [
             "复杂逻辑仍需人工审查",
             "误报率需要控制"
         ],
-        recommendation="可以作为辅助工具，但不能完全替代人工"
+        recommendation="可以作为辅助工具，但不能完全替代人工",
+        alternative_solution="使用 linter + 静态分析工具"
     ),
     CaseStudy(
         name="报表生成",
@@ -418,7 +463,8 @@ CASE_STUDIES = [
             "模板引擎更合适",
             "Agent 的不确定性会导致格式错误"
         ],
-        recommendation="不建议使用 Agent，使用模板引擎"
+        recommendation="不建议使用 Agent，使用模板引擎",
+        alternative_solution="使用 Jinja2 或类似模板引擎"
     ),
     CaseStudy(
         name="研究助手",
@@ -430,7 +476,8 @@ CASE_STUDIES = [
             "需要整合多个数据源",
             "推理能力很有价值"
         ],
-        recommendation="非常适合使用 Agent"
+        recommendation="非常适合使用 Agent",
+        alternative_solution="无合适的替代方案"
     ),
     CaseStudy(
         name="定时任务",
@@ -442,9 +489,37 @@ CASE_STUDIES = [
             "cron + 脚本更简单可靠",
             "Agent 增加了不必要的复杂性"
         ],
-        recommendation="不建议使用 Agent，使用定时任务调度器"
+        recommendation="不建议使用 Agent，使用定时任务调度器",
+        alternative_solution="使用 cron、APScheduler 等"
+    ),
+    CaseStudy(
+        name="多语言翻译",
+        description="将文档翻译成多种语言",
+        used_agent=True,
+        outcome=CaseOutcome.SUCCESS,
+        lessons_learned=[
+            "Agent 适合处理语言任务",
+            "可以保持上下文一致性",
+            "支持批量处理"
+        ],
+        recommendation="适合使用 Agent",
+        alternative_solution="使用传统翻译 API（如 Google Translate）"
+    ),
+    CaseStudy(
+        name="文件备份",
+        description="定期备份文件到云存储",
+        used_agent=True,
+        outcome=CaseOutcome.FAILURE,
+        lessons_learned=[
+            "文件备份是确定性任务",
+            "rsync + cron 更简单可靠",
+            "Agent 增加了失败风险"
+        ],
+        recommendation="不建议使用 Agent，使用 rsync + cron",
+        alternative_solution="rsync、rclone + cron"
     ),
 ]
+
 
 def analyze_cases():
     """分析案例"""
@@ -471,6 +546,7 @@ def analyze_cases():
     for case in failure_cases:
         print(f"  - {case.name}: {case.description}")
         print(f"    教训: {case.lessons_learned[0]}")
+        print(f"    替代方案: {case.alternative_solution}")
     print()
     
     # 总结
@@ -479,40 +555,148 @@ def analyze_cases():
     print("2. Agent 不适合：简单、确定性、固定格式的任务")
     print("3. 选择时要考虑：复杂度、成本、维护难度")
 
+
 if __name__ == "__main__":
     analyze_cases()
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 过度设计 | 使用决策树评估必要性 |
-| 2 | 成本过高 | 考虑替代方案 |
-| 3 | 可靠性差 | 考虑使用确定性方案 |
-| 4 | 维护困难 | 重新评估架构选择 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| Agent | 能自主执行任务的智能程序 |
-| 确定性任务 | 结果可预测的任务 |
-| 非确定性任务 | 结果有变化的任务 |
-| 工具使用 | Agent 调用外部 API 或函数 |
-| 推理能力 | 理解上下文并做出判断 |
-| 过度设计 | 使用复杂方案解决简单问题 |
+## 第五部分：实战练习
 
-## ✅ 验收清单
+### 练习：评估任务
+
+```python
+"""
+实战练习：评估以下任务是否应该使用 Agent
+"""
+
+from app.agent_framework.decision import (
+    AgentDecisionFramework,
+    TaskAnalysis,
+    TaskComplexity,
+    TaskType
+)
+
+
+def evaluate_task(name: str, description: str, **kwargs):
+    """评估任务"""
+    framework = AgentDecisionFramework()
+    
+    task = TaskAnalysis(
+        name=name,
+        description=description,
+        **kwargs
+    )
+    
+    recommendation = framework.analyze_task(task)
+    
+    print(f"\n任务: {name}")
+    print(f"描述: {description}")
+    print(f"使用 Agent: {'是' if recommendation.use_agent else '否'}")
+    print(f"置信度: {recommendation.confidence:.2f}")
+    print(f"原因: {recommendation.reason}")
+    if recommendation.alternatives:
+        print(f"替代方案: {', '.join(recommendation.alternatives)}")
+    
+    return recommendation
+
+
+# 练习任务
+if __name__ == "__main__":
+    print("=== 任务评估练习 ===")
+    
+    # 任务1：情感分析
+    evaluate_task(
+        "情感分析",
+        "分析用户评论的情感倾向",
+        complexity=TaskComplexity.MODERATE,
+        task_type=TaskType.ANALYTICAL,
+        uncertainty_level=0.6,
+        tool_dependency=0.5,
+        user_interaction=0.2,
+        error_tolerance=0.7,
+        cost_sensitivity=0.5
+    )
+    
+    # 任务2：数据清洗
+    evaluate_task(
+        "数据清洗",
+        "清洗CSV文件中的脏数据",
+        complexity=TaskComplexity.SIMPLE,
+        task_type=TaskType.DETERMINISTIC,
+        uncertainty_level=0.2,
+        tool_dependency=0.3,
+        user_interaction=0.1,
+        error_tolerance=0.8,
+        cost_sensitivity=0.9
+    )
+    
+    # 任务3：智能客服
+    evaluate_task(
+        "智能客服",
+        "处理客户咨询，自动回答问题",
+        complexity=TaskComplexity.COMPLEX,
+        task_type=TaskType.INTERACTIVE,
+        uncertainty_level=0.8,
+        tool_dependency=0.7,
+        user_interaction=0.9,
+        error_tolerance=0.4,
+        cost_sensitivity=0.3
+    )
+    
+    # 任务4：定时报告
+    evaluate_task(
+        "定时报告",
+        "每天定时生成销售报告",
+        complexity=TaskComplexity.SIMPLE,
+        task_type=TaskType.DETERMINISTIC,
+        uncertainty_level=0.1,
+        tool_dependency=0.4,
+        user_interaction=0.0,
+        error_tolerance=0.9,
+        cost_sensitivity=0.8
+    )
+```
+
+---
+
+## 验证清单
+
+完成今日学习后，检查以下项目：
+
 - [ ] 理解 Agent 的适用场景
 - [ ] 能使用判断框架分析任务
 - [ ] 了解常见的替代方案
 - [ ] 能从案例中总结经验
+- [ ] 建立了理性决策的思维方式
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+---
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+## 今日小结
+
+| 概念 | 关键点 |
+|------|--------|
+| Agent 适用性 | 不是所有任务都需要 Agent |
+| 决策框架 | 系统化评估任务复杂度 |
+| 替代方案 | 脚本、规则引擎、工作流等 |
+| 案例分析 | 从成功和失败中学习 |
+| 过度设计 | 使用复杂方案解决简单问题 |
+| 成本效益 | 考虑开发和维护成本 |
+
+---
+
+## 明日预告
+
+明天我们将学习：
+- LLM API 工程实践
+- 流式调用
+- Token 管理
+- 成本优化
+
+---
+
+## 参考资源
+
+- [Agent 设计模式](https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/)
+- [何时使用 AI Agent](https://towardsdatascience.com/when-to-use-ai-agents/)

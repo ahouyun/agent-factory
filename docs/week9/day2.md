@@ -1,451 +1,721 @@
 # 📅 Week 9 Day 2：后端骨架搭建
 
 ## 🧭 今日方向
-> 搭建项目的后端骨架：FastAPI 应用、数据库模型、API 路由。这是后续所有功能的基础。
+> 搭建项目的后端骨架：FastAPI 应用、数据库连接、SQLAlchemy 数据模型、基础 CRUD API。这是后续所有功能的基础骨架。
 
 ## 🎯 生活比喻
-> 今天的工作就像"盖房子打地基"。虽然还看不到漂亮的房子（功能），但坚固的地基（骨架）是必须的。
+> 今天的工作就像"盖房子打地基和立框架"。虽然还看不到漂亮的装修（功能），但坚固的地基（数据库）和钢架（API 路由）是必须的。地基不牢，房子迟早要塌。
 
 ## 📋 今日三件事
-1. 搭建 FastAPI 应用骨架
-2. 定义数据库模型
-3. 实现基础 CRUD API
+1. 创建 FastAPI 应用并配置项目结构
+2. 定义 SQLAlchemy 数据模型（User / Document / Conversation / Message）
+3. 实现基础 CRUD API 路由并验证可用
+
+---
 
 ## 🗺️ 手把手路线
 
-### Step 1: 项目结构
-- 做什么: 创建标准的项目目录结构
-- 为什么: 良好的结构便于维护和扩展
-- 成功标志: 有一个清晰的项目结构
+### Step 1: 项目初始化
+- **做什么:** 创建项目目录、安装依赖、配置环境变量
+- **为什么:** 标准化的项目结构便于团队协作和维护
+- **成功标志:** 能成功创建虚拟环境并安装所有依赖
 
-### Step 2: 数据库模型
-- 做什么: 用 SQLAlchemy 定义数据模型
-- 为什么: 数据模型是业务逻辑的基础
-- 成功标志: 模型能正常创建和查询
+### Step 2: 数据库与数据模型
+- **做什么:** 配置 SQLAlchemy、定义 ORM 模型、创建数据库表
+- **为什么:** 数据模型是所有业务逻辑的基础
+- **成功标志:** 模型能正常创建表、插入数据、查询数据
 
-### Step 3: API 路由
-- 做什么: 实现基础的 CRUD API
-- 为什么: API 是前后端交互的桥梁
-- 成功标志: API 能正常调用
+### Step 3: API 路由框架
+- **做什么:** 实现 FastAPI 路由、注册到主应用、验证可用
+- **为什么:** API 是前后端交互的桥梁
+- **成功标志:** 所有 API 能通过 Swagger UI 正常调用
+
+---
 
 ## 💻 代码区
+
+### 完整可运行代码：后端骨架搭建
 
 ```python
 """
 Week 9 Day 2: 后端骨架搭建
+运行方式: python day2_backend_skeleton.py
+
+注意: 本脚本使用 SQLite 内存数据库，无需额外安装数据库。
+实际项目中请替换为 PostgreSQL。
 """
 
-# ========== 1. 项目结构 ==========
-print("=== 1. 项目结构 ===")
+import sqlite3
+import json
+from datetime import datetime
+from typing import Optional, List
+from dataclasses import dataclass, field, asdict
+from enum import Enum
+
+
+# =============================================
+# 1. 项目结构说明
+# =============================================
+print("=" * 60)
+print("=== 1. 项目目录结构 ===")
+print("=" * 60)
 
 project_structure = """
-agent-factory/
-├── app/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI 应用入口
-│   ├── config.py            # 配置管理
-│   ├── database.py          # 数据库连接
-│   ├── models/              # 数据模型
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── document.py
-│   │   └── conversation.py
-│   ├── schemas/             # Pydantic 模型
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── document.py
-│   │   └── conversation.py
-│   ├── api/                 # API 路由
-│   │   ├── __init__.py
-│   │   ├── auth.py
-│   │   ├── documents.py
-│   │   └── conversations.py
-│   ├── services/            # 业务逻辑
-│   │   ├── __init__.py
-│   │   ├── rag_service.py
-│   │   └── agent_service.py
-│   └── utils/               # 工具函数
-│       ├── __init__.py
-│       └── helpers.py
-├── requirements.txt
-├── .env.example
-└── README.md
+  ai-knowledge-assistant/
+  ├── app/
+  │   ├── __init__.py
+  │   ├── main.py                  # FastAPI 应用入口
+  │   ├── config.py                # 配置管理
+  │   ├── database.py              # 数据库连接
+  │   ├── models/                  # SQLAlchemy 数据模型
+  │   │   ├── __init__.py
+  │   │   ├── user.py
+  │   │   ├── document.py
+  │   │   └── conversation.py
+  │   ├── schemas/                 # Pydantic 请求/响应模型
+  │   ├── api/                     # API 路由
+  │   │   ├── __init__.py
+  │   │   ├── auth.py
+  │   │   ├── documents.py
+  │   │   └── chat.py
+  │   ├── services/                # 业务逻辑层
+  │   └── utils/                   # 工具函数
+  ├── requirements.txt
+  ├── .env.example
+  └── README.md
 """
 print(project_structure)
 
-# ========== 2. 配置管理 ==========
-print("\n=== 2. 配置管理 ===")
 
-from pydantic_settings import BaseSettings
-from typing import Optional
+# =============================================
+# 2. 配置管理 (模拟 Pydantic Settings)
+# =============================================
+print("=" * 60)
+print("=== 2. 配置管理 ===")
+print("=" * 60)
 
-class Settings(BaseSettings):
-    """应用配置"""
-    # 应用
-    APP_NAME: str = "AI Agent 知识助手"
-    APP_VERSION: str = "1.0.0"
+@dataclass
+class Settings:
+    """应用配置 - 实际项目使用 pydantic-settings"""
+    APP_NAME: str = "AI 知识库助手"
+    APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
 
     # 数据库
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/agent_factory"
+    DATABASE_URL: str = "sqlite:///./data/ai_knowledge.db"
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
-
-    # OpenAI
+    # LLM 配置
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
-    # Chroma
-    CHROMA_PERSIST_DIR: str = "./chroma_data"
+    # 向量数据库
+    CHROMA_PERSIST_DIR: str = "./data/chroma_db"
     CHROMA_COLLECTION: str = "documents"
 
-    # 安全
-    SECRET_KEY: str = "your-secret-key-here"
+    # JWT 认证
+    SECRET_KEY: str = "dev-secret-key-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    class Config:
-        env_file = ".env"
+    # RAG 配置
+    CHUNK_SIZE: int = 500
+    CHUNK_OVERLAP: int = 50
+    TOP_K_RESULTS: int = 3
 
-# 使用配置
+    # 限流
+    RATE_LIMIT_PER_MINUTE: int = 60
+
+
 settings = Settings()
-print(f"应用名称: {settings.APP_NAME}")
-print(f"数据库: {settings.DATABASE_URL[:30]}...")
+print(f"  应用名称: {settings.APP_NAME}")
+print(f"  版本: {settings.APP_VERSION}")
+print(f"  数据库: {settings.DATABASE_URL}")
+print(f"  LLM 模型: {settings.OPENAI_MODEL}")
+print(f"  Embedding: {settings.EMBEDDING_MODEL}")
 
-# ========== 3. 数据库设置 ==========
-print("\n=== 3. 数据库设置 ===")
 
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+# =============================================
+# 3. 数据库设置 (SQLite 演示)
+# =============================================
+print("\n" + "=" * 60)
+print("=== 3. 数据库设置 (SQLite 演示) ===")
+print("=" * 60)
 
-# 创建数据库引擎
-# 注意：实际使用时需要配置真实的数据库 URL
-# engine = create_engine(settings.DATABASE_URL)
-# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# Base = declarative_base()
+# 创建 SQLite 内存数据库（演示用）
+conn = sqlite3.connect(":memory:")
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
 
-# 模拟数据库（用于演示）
-print("数据库配置:")
-print("  引擎: PostgreSQL")
-print("  ORM: SQLAlchemy")
-print("  迁移: Alembic")
+print("  数据库连接成功: SQLite 内存数据库")
+print("  注意: 生产环境请使用 PostgreSQL")
 
-# ========== 4. 数据模型 ==========
-print("\n=== 4. 数据模型 ===")
 
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field
-from enum import Enum
+# =============================================
+# 4. 数据模型定义 (SQLAlchemy 风格)
+# =============================================
+print("\n" + "=" * 60)
+print("=== 4. 数据模型定义 ===")
+print("=" * 60)
 
-# 枚举类型
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    USER = "user"
+# --- 创建 User 表 ---
+cursor.execute("""
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'user',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+)
+""")
+print("  [OK] users 表创建成功")
 
-class DocumentType(str, Enum):
-    PDF = "pdf"
-    DOCX = "docx"
-    MD = "md"
-    TXT = "txt"
+# --- 创建 Document 表 ---
+cursor.execute("""
+CREATE TABLE documents (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    content_type TEXT DEFAULT 'text/plain',
+    chunk_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)
+""")
+print("  [OK] documents 表创建成功")
 
-# 用户模型
-class UserBase(BaseModel):
-    email: str
-    name: str
-    role: UserRole = UserRole.USER
+# --- 创建 Conversation 表 ---
+cursor.execute("""
+CREATE TABLE conversations (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)
+""")
+print("  [OK] conversations 表创建成功")
 
-class UserCreate(UserBase):
-    password: str
+# --- 创建 Message 表 ---
+cursor.execute("""
+CREATE TABLE messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    sources TEXT DEFAULT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+)
+""")
+print("  [OK] messages 表创建成功")
 
-class User(UserBase):
-    id: str = Field(default_factory=lambda: "user_001")
-    created_at: datetime = Field(default_factory=datetime.now)
+conn.commit()
 
-    class Config:
-        from_attributes = True
+# 打印数据模型说明
+model_info = """
+  数据模型说明:
 
-# 文档模型
-class DocumentBase(BaseModel):
-    name: str
-    file_type: DocumentType
+  User (用户表):
+    id         TEXT PK    用户唯一标识 (UUID)
+    email      TEXT UNIQ  邮箱地址
+    name       TEXT       用户名称
+    password_hash TEXT    密码哈希值
+    role       TEXT       角色 (admin/user)
+    created_at TEXT       创建时间
 
-class DocumentCreate(DocumentBase):
-    content: str
+  Document (文档表):
+    id         TEXT PK    文档唯一标识 (UUID)
+    user_id    TEXT FK    所属用户
+    filename   TEXT       文件名
+    file_path  TEXT       存储路径
+    file_size  INTEGER    文件大小 (bytes)
+    content_type TEXT     内容类型
+    chunk_count INTEGER   分块数量
+    status     TEXT       状态 (pending/processed/error)
+    created_at TEXT       创建时间
 
-class Document(DocumentBase):
-    id: str = Field(default_factory=lambda: "doc_001")
-    user_id: str
-    chunk_count: int = 0
-    created_at: datetime = Field(default_factory=datetime.now)
+  Conversation (对话表):
+    id         TEXT PK    对话唯一标识 (UUID)
+    user_id    TEXT FK    所属用户
+    title      TEXT       对话标题
+    created_at TEXT       创建时间
+    updated_at TEXT       更新时间
 
-    class Config:
-        from_attributes = True
+  Message (消息表):
+    id              TEXT PK    消息唯一标识 (UUID)
+    conversation_id TEXT FK    所属对话
+    role            TEXT       角色 (user/assistant)
+    content         TEXT       消息内容
+    sources         TEXT       引用来源 (JSON)
+    created_at      TEXT       创建时间
+"""
+print(model_info)
 
-# 对话模型
-class ConversationBase(BaseModel):
-    title: str
 
-class ConversationCreate(ConversationBase):
-    pass
+# =============================================
+# 5. 基础 CRUD 操作
+# =============================================
+print("=" * 60)
+print("=== 5. 基础 CRUD 操作演示 ===")
+print("=" * 60)
 
-class Conversation(ConversationBase):
-    id: str = Field(default_factory=lambda: "conv_001")
-    user_id: str
-    message_count: int = 0
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+import uuid
 
-    class Config:
-        from_attributes = True
+# --- 创建 (Create) ---
+print("\n--- 创建数据 ---")
 
-# 消息模型
-class MessageBase(BaseModel):
-    role: str  # user/assistant
-    content: str
+# 创建用户
+user_id = str(uuid.uuid4())
+cursor.execute(
+    "INSERT INTO users (id, email, name, password_hash, role) VALUES (?, ?, ?, ?, ?)",
+    (user_id, "zhang@example.com", "张三", "hashed_password_123", "admin")
+)
+print(f"  [CREATE] 用户创建成功: 张三 (ID: {user_id[:8]}...)")
 
-class MessageCreate(MessageBase):
-    pass
+# 创建文档
+doc_id = str(uuid.uuid4())
+cursor.execute(
+    "INSERT INTO documents (id, user_id, filename, file_path, file_size, content_type, chunk_count, status) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    (doc_id, user_id, "产品说明书.pdf", "/data/raw/产品说明书.pdf", 1024000, "application/pdf", 45, "processed")
+)
+print(f"  [CREATE] 文档创建成功: 产品说明书.pdf (ID: {doc_id[:8]}...)")
 
-class Message(MessageBase):
-    id: str = Field(default_factory=lambda: "msg_001")
-    conversation_id: str
-    sources: Optional[List[dict]] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+# 创建对话
+conv_id = str(uuid.uuid4())
+cursor.execute(
+    "INSERT INTO conversations (id, user_id, title) VALUES (?, ?, ?)",
+    (conv_id, user_id, "关于产品功能的咨询")
+)
+print(f"  [CREATE] 对话创建成功: 关于产品功能的咨询 (ID: {conv_id[:8]}...)")
 
-    class Config:
-        from_attributes = True
+# 创建消息
+msg_id = str(uuid.uuid4())
+cursor.execute(
+    "INSERT INTO messages (id, conversation_id, role, content, sources) VALUES (?, ?, ?, ?, ?)",
+    (msg_id, conv_id, "user", "这个产品有哪些核心功能？", None)
+)
+print(f"  [CREATE] 消息创建成功: 用户提问 (ID: {msg_id[:8]}...)")
 
-# 打印模型
-print("用户模型字段:", list(User.model_fields.keys()))
-print("文档模型字段:", list(Document.model_fields.keys()))
-print("对话模型字段:", list(Conversation.model_fields.keys()))
-print("消息模型字段:", list(Message.model_fields.keys()))
+# 助手回复
+reply_id = str(uuid.uuid4())
+sources = json.dumps([{"doc_id": doc_id, "chunk_index": 3, "score": 0.92}])
+cursor.execute(
+    "INSERT INTO messages (id, conversation_id, role, content, sources) VALUES (?, ?, ?, ?, ?)",
+    (reply_id, conv_id, "assistant", "根据文档内容，该产品具有以下核心功能：...", sources)
+)
+print(f"  [CREATE] 消息创建成功: 助手回复 (ID: {reply_id[:8]}...)")
 
-# ========== 5. API 路由 ==========
-print("\n=== 5. API 路由 ===")
+conn.commit()
 
-from fastapi import FastAPI, HTTPException, Depends
-from typing import List
+# --- 读取 (Read) ---
+print("\n--- 读取数据 ---")
 
-# 创建 FastAPI 应用
+# 查询用户
+cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+user = dict(cursor.fetchone())
+print(f"  [READ] 用户: {user['name']} ({user['email']})")
+
+# 查询文档列表
+cursor.execute("SELECT * FROM documents WHERE user_id = ?", (user_id,))
+docs = [dict(row) for row in cursor.fetchall()]
+print(f"  [READ] 文档列表: {len(docs)} 个")
+for doc in docs:
+    print(f"    - {doc['filename']} ({doc['status']}, {doc['chunk_count']} chunks)")
+
+# 查询对话消息
+cursor.execute("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at", (conv_id,))
+messages = [dict(row) for row in cursor.fetchall()]
+print(f"  [READ] 对话消息: {len(messages)} 条")
+for msg in messages:
+    role_label = "用户" if msg["role"] == "user" else "助手"
+    print(f"    [{role_label}] {msg['content'][:50]}...")
+
+# --- 更新 (Update) ---
+print("\n--- 更新数据 ---")
+
+cursor.execute(
+    "UPDATE documents SET chunk_count = ?, status = ? WHERE id = ?",
+    (52, "processed", doc_id)
+)
+conn.commit()
+print(f"  [UPDATE] 文档 chunk_count 更新为 52")
+
+# --- 删除 (Delete) ---
+print("\n--- 删除数据 ---")
+
+cursor.execute("DELETE FROM messages WHERE id = ?", (reply_id,))
+conn.commit()
+print(f"  [DELETE] 助手回复消息已删除")
+
+
+# =============================================
+# 6. FastAPI 应用入口 (模板代码)
+# =============================================
+print("\n" + "=" * 60)
+print("=== 6. FastAPI 应用入口 (app/main.py 模板) ===")
+print("=" * 60)
+
+main_py_template = '''
+# app/main.py
+"""
+AI 知识库助手 - FastAPI 应用入口
+"""
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+from app.api import auth, documents, chat
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} 启动中...")
+    # 初始化数据库、向量存储等资源
+    yield
+    # 清理资源
+    print("🛑 应用关闭")
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="基于 RAG 的智能问答系统"
+    lifespan=lifespan,
 )
 
-# 模拟数据存储
-users_db = {}
+# CORS 配置
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 注册路由
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
+app.include_router(documents.router, prefix="/api/v1/documents", tags=["文档管理"])
+app.include_router(chat.router, prefix="/api/v1/chat", tags=["知识问答"])
+
+
+@app.get("/health", tags=["系统"])
+async def health_check():
+    return {"status": "healthy", "version": settings.APP_VERSION}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+'''
+print(main_py_template)
+
+
+# =============================================
+# 7. API 路由模板
+# =============================================
+print("=" * 60)
+print("=== 7. API 路由模板 (app/api/documents.py) ===")
+print("=" * 60)
+
+documents_api_template = '''
+# app/api/documents.py
+"""
+文档管理 API 路由
+"""
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from typing import List
+
+router = APIRouter()
+
+# 模拟数据存储（实际使用数据库）
 documents_db = {}
-conversations_db = {}
-messages_db = {}
 
-# 认证路由
-@app.post("/api/auth/register", response_model=User)
-async def register(user: UserCreate):
-    """用户注册"""
-    if user.email in users_db:
-        raise HTTPException(status_code=400, detail="邮箱已注册")
 
-    new_user = User(
-        id=f"user_{len(users_db) + 1}",
-        email=user.email,
-        name=user.name,
-        role=user.role
-    )
-    users_db[user.email] = new_user
-    return new_user
-
-@app.post("/api/auth/login")
-async def login(email: str, password: str):
-    """用户登录"""
-    if email not in users_db:
-        raise HTTPException(status_code=401, detail="用户不存在")
-    return {"token": "fake_token", "user": users_db[email]}
-
-# 文档路由
-@app.post("/api/documents", response_model=Document)
-async def create_document(doc: DocumentCreate, user_id: str = "user_001"):
+@router.post("/upload")
+async def upload_document(file: UploadFile = File(...)):
     """上传文档"""
-    new_doc = Document(
-        id=f"doc_{len(documents_db) + 1}",
-        name=doc.name,
-        file_type=doc.file_type,
-        user_id=user_id
-    )
-    documents_db[new_doc.id] = new_doc
-    return new_doc
+    # 读取文件内容
+    content = await file.read()
+    file_size = len(content)
 
-@app.get("/api/documents", response_model=List[Document])
-async def list_documents(user_id: str = "user_001"):
+    # 验证文件大小
+    if file_size > 10 * 1024 * 1024:  # 10MB
+        raise HTTPException(status_code=400, detail="文件大小超过 10MB 限制")
+
+    # 验证文件类型
+    allowed_types = [".pdf", ".docx", ".md", ".txt"]
+    if not any(file.filename.endswith(ext) for ext in allowed_types):
+        raise HTTPException(status_code=400, detail=f"不支持的文件类型，支持: {allowed_types}")
+
+    # 保存文档记录
+    doc_id = f"doc_{len(documents_db) + 1}"
+    documents_db[doc_id] = {
+        "id": doc_id,
+        "filename": file.filename,
+        "file_size": file_size,
+        "content_type": file.content_type,
+        "status": "uploaded",
+    }
+
+    return {
+        "id": doc_id,
+        "filename": file.filename,
+        "file_size": file_size,
+        "status": "uploaded",
+        "message": "文档上传成功，等待处理",
+    }
+
+
+@router.get("")
+async def list_documents():
     """获取文档列表"""
-    return [doc for doc in documents_db.values() if doc.user_id == user_id]
+    return {"documents": list(documents_db.values())}
 
-@app.get("/api/documents/{doc_id}", response_model=Document)
+
+@router.get("/{doc_id}")
 async def get_document(doc_id: str):
     """获取文档详情"""
     if doc_id not in documents_db:
         raise HTTPException(status_code=404, detail="文档不存在")
     return documents_db[doc_id]
 
-@app.delete("/api/documents/{doc_id}")
+
+@router.delete("/{doc_id}")
 async def delete_document(doc_id: str):
     """删除文档"""
     if doc_id not in documents_db:
         raise HTTPException(status_code=404, detail="文档不存在")
     del documents_db[doc_id]
     return {"message": "删除成功"}
+'''
+print(documents_api_template)
 
-# 对话路由
-@app.post("/api/conversations", response_model=Conversation)
-async def create_conversation(conv: ConversationCreate, user_id: str = "user_001"):
-    """创建对话"""
-    new_conv = Conversation(
-        id=f"conv_{len(conversations_db) + 1}",
-        title=conv.title,
-        user_id=user_id
-    )
-    conversations_db[new_conv.id] = new_conv
-    return new_conv
 
-@app.get("/api/conversations", response_model=List[Conversation])
-async def list_conversations(user_id: str = "user_001"):
-    """获取对话列表"""
-    return [c for c in conversations_db.values() if c.user_id == user_id]
+# =============================================
+# 8. 启动命令
+# =============================================
+print("\n" + "=" * 60)
+print("=== 8. 启动命令 ===")
+print("=" * 60)
 
-@app.post("/api/conversations/{conv_id}/messages", response_model=Message)
-async def send_message(conv_id: str, msg: MessageCreate):
-    """发送消息"""
-    if conv_id not in conversations_db:
-        raise HTTPException(status_code=404, detail="对话不存在")
+startup_commands = """
+  # 安装依赖
+  pip install fastapi uvicorn[standard] python-multipart sqlalchemy python-dotenv
 
-    new_msg = Message(
-        id=f"msg_{len(messages_db) + 1}",
-        conversation_id=conv_id,
-        role=msg.role,
-        content=msg.content
-    )
-    messages_db[new_msg.id] = new_msg
-    return new_msg
+  # 开发模式启动（带热重载）
+  cd ai-knowledge-assistant
+  uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-print("API 路由已定义:")
-print("  POST   /api/auth/register")
-print("  POST   /api/auth/login")
-print("  POST   /api/documents")
-print("  GET    /api/documents")
-print("  GET    /api/documents/{id}")
-print("  DELETE /api/documents/{id}")
-print("  POST   /api/conversations")
-print("  GET    /api/conversations")
-print("  POST   /api/conversations/{id}/messages")
+  # 生产模式启动
+  uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
-# ========== 6. 启动应用 ==========
-print("\n=== 6. 启动应用 ===")
+  # 访问 API 文档
+  http://localhost:8000/docs          # Swagger UI
+  http://localhost:8000/redoc         # ReDoc 文档
 
+  # 健康检查
+  curl http://localhost:8000/health
+"""
+print(startup_commands)
+
+
+# =============================================
+# 总结
+# =============================================
+print("=" * 60)
+print("✅ Day 2 完成清单")
+print("=" * 60)
 print("""
-启动命令:
+  [x] 项目目录结构创建完成
+  [x] 配置管理系统搭建完成
+  [x] 数据库模型定义完成 (User/Document/Conversation/Message)
+  [x] CRUD 操作验证通过
+  [x] FastAPI 应用入口模板准备
+  [x] API 路由模板准备
 
-# 开发模式
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# 生产模式
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
-
-# 访问 API 文档
-http://localhost:8000/docs
-""")
-
-# 测试 API
-print("--- API 测试 ---")
-
-# 模拟测试
-import asyncio
-
-async def test_api():
-    # 注册用户
-    user = await register(UserCreate(
-        email="test@example.com",
-        name="测试用户",
-        password="123456"
-    ))
-    print(f"注册用户: {user.name}")
-
-    # 上传文档
-    doc = await create_document(DocumentCreate(
-        name="测试文档",
-        file_type="md",
-        content="这是一个测试文档"
-    ))
-    print(f"上传文档: {doc.name}")
-
-    # 创建对话
-    conv = await create_conversation(ConversationCreate(
-        title="测试对话"
-    ))
-    print(f"创建对话: {conv.title}")
-
-    # 发送消息
-    msg = await send_message(conv.id, MessageCreate(
-        role="user",
-        content="你好"
-    ))
-    print(f"发送消息: {msg.content}")
-
-# asyncio.run(test_api())
-
-print("""
-=== 今日完成 ===
-
-1. 项目结构已创建
-2. 配置管理系统已搭建
-3. 数据模型已定义
-4. 基础 API 已实现
-5. 应用可以启动
-
-下一步:
-- 连接真实数据库
-- 实现 RAG 服务
-- 添加认证中间件
+  明天预告: Day 3 将集成 RAG 检索服务，实现文档解析、
+  向量化存储和语义检索的完整流程。
 """)
 ```
 
-## 🆘 急救包
+---
 
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | FastAPI 启动失败 | 检查端口占用，或安装 `uvicorn[standard]` |
-| 2 | 数据库连接失败 | 检查 DATABASE_URL 配置 |
-| 3 | 模型导入错误 | 检查 __init__.py 是否正确导出 |
-| 4 | API 404 | 检查路由路径和函数名 |
+## 📤 预期输出
+
+运行 `python day2_backend_skeleton.py` 后，你将看到：
+
+```
+============================================================
+=== 1. 项目目录结构 ===
+============================================================
+
+  ai-knowledge-assistant/
+  ├── app/
+  │   ├── __init__.py
+  │   ├── main.py                  # FastAPI 应用入口
+  ...
+
+============================================================
+=== 2. 配置管理 ===
+============================================================
+  应用名称: AI 知识库助手
+  版本: 0.1.0
+  数据库: sqlite:///./data/ai_knowledge.db
+  LLM 模型: gpt-4o-mini
+  Embedding: text-embedding-3-small
+
+============================================================
+=== 3. 数据库设置 (SQLite 演示) ===
+============================================================
+  数据库连接成功: SQLite 内存数据库
+
+============================================================
+=== 4. 数据模型定义 ===
+============================================================
+  [OK] users 表创建成功
+  [OK] documents 表创建成功
+  [OK] conversations 表创建成功
+  [OK] messages 表创建成功
+
+============================================================
+=== 5. 基础 CRUD 操作演示 ===
+============================================================
+
+--- 创建数据 ---
+  [CREATE] 用户创建成功: 张三 (ID: a1b2c3d4...)
+  [CREATE] 文档创建成功: 产品说明书.pdf (ID: e5f6a7b8...)
+  ...
+
+--- 读取数据 ---
+  [READ] 用户: 张三 (zhang@example.com)
+  [READ] 文档列表: 1 个
+    - 产品说明书.pdf (processed, 45 chunks)
+  ...
+```
+
+---
+
+## ⚠️ 常见错误与解决方案
+
+### 错误 1：`ModuleNotFoundError: No module named 'fastapi'`
+
+```
+ModuleNotFoundError: No module named 'fastapi'
+```
+
+**原因:** 未安装 FastAPI 或未激活虚拟环境。
+
+**解决方案:**
+```bash
+# 激活虚拟环境
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+
+# 安装依赖
+pip install fastapi uvicorn[standard] python-multipart
+```
+
+### 错误 2：`sqlite3.OperationalError: table already exists`
+
+```
+sqlite3.OperationalError: table users already exists
+```
+
+**原因:** 重复创建已存在的表。
+
+**解决方案:**
+```sql
+-- 使用 IF NOT EXISTS
+CREATE TABLE IF NOT EXISTS users (...)
+```
+
+### 错误 3：`pydantic_settings` 导入错误
+
+```
+ImportError: cannot import name 'BaseSettings' from 'pydantic'
+```
+
+**原因:** pydantic v2 将 BaseSettings 移到了独立包。
+
+**解决方案:**
+```bash
+pip install pydantic-settings
+# 或
+pip install "pydantic[dotenv]"
+```
+
+### 错误 4：端口 8000 被占用
+
+```
+ERROR: [Errno 10048] 通常每个套接字地址只允许使用一次
+```
+
+**解决方案:**
+```bash
+# 查找占用端口的进程 (Windows)
+netstat -ano | findstr :8000
+
+# 使用其他端口
+uvicorn app.main:app --port 8001
+```
+
+---
 
 ## 📖 概念对照表
 
 | 术语 | 一句话解释 |
 |------|-----------|
 | FastAPI | 高性能 Python Web 框架，自动生成 API 文档 |
-| SQLAlchemy | Python ORM，用于数据库操作 |
-| Pydantic | 数据验证库，基于类型注解 |
-| CRUD | Create/Read/Update/Delete 四种基本操作 |
-| ORM | 对象关系映射，将数据库表映射为 Python 类 |
+| SQLAlchemy | Python ORM，将数据库表映射为 Python 类 |
+| Pydantic | 数据验证库，基于 Python 类型注解 |
+| CRUD | Create / Read / Update / Delete 四种基本操作 |
+| ORM | 对象关系映射，用 Python 代码操作数据库 |
 | Alembic | SQLAlchemy 的数据库迁移工具 |
+| uvicorn | ASGI 服务器，用于运行 FastAPI 应用 |
+| lifespan | FastAPI 的应用生命周期管理机制 |
 
-## ✅ 验收清单
-- [ ] 项目结构清晰完整
-- [ ] 配置管理系统可用
-- [ ] 数据模型定义完整
-- [ ] 基础 API 能正常调用
-- [ ] 应用能正常启动
-- [ ] API 文档能访问
+---
+
+## 🏆 每日挑战
+
+### 挑战 1：基础（必做）
+1. 按照模板创建完整的项目目录结构
+2. 在虚拟环境中安装所有依赖
+3. 使用 SQLite 演示代码验证 CRUD 操作
+
+### 挑战 2：进阶（推荐）
+1. 安装 Alembic 并初始化数据库迁移
+2. 编写 `app/config.py`，使用 pydantic-settings 管理配置
+3. 编写 `app/database.py`，配置 SQLAlchemy 异步连接
+
+### 挑战 3：挑战（可选）
+使用 FastAPI 创建一个完整的文档管理 API，包含：
+- 文件上传（支持 PDF/MD/TXT）
+- 文档列表查询
+- 文档详情查询
+- 文档删除
+
+然后用 `curl` 或 Postman 测试所有接口。
+
+---
 
 ## 📝 复盘小纸条
 - 今天最大的收获: ...
 - 还不太确定的: ...
+- 明天需要重点关注: ...
+
+---
 
 ## 📥 明日同步接口
 - 今日完成度: ...
 - 卡点描述: ...
 - 代码是否能跑通: ...
-- 明天希望: ...
+- 明天希望重点解决: ...

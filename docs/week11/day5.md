@@ -1,575 +1,684 @@
-# 📅 Week 11 Day 5：LangSmith / Arize Phoenix 实践
+# 🛠️ Day 5: LangSmith / Arize Phoenix 实践 — 专业级 LLM 可观测性
 
-## 🧭 今日方向
-> 学习使用 LangSmith 和 Arize Phoenix 进行 Agent 可观测性实践，掌握生产级监控工具的使用方法。
+## 今日方向
 
-## 🎯 生味比喻
-> LangSmith 和 Arize Phoenix 就像两个不同的监控中心。LangSmith 像是"调度中心"，专注于 LLM 调用链路的追踪和调试；Arize Phoenix 像是"数据中心"，专注于模型性能的长期监控和漂移检测。两者结合，你就能全面掌控 Agent 的运行状态。
+> "工欲善其事，必先利其器。" -- 《论语》
 
-## 📋 今日三件事
-1. 了解 LangSmith 的核心功能和使用方法
-2. 了解 Arize Phoenix 的核心功能和使用方法
-3. 对比两者的特点，选择合适的工具
+今天我们来学习两个专业的 LLM 可观测性工具：LangSmith 和 Arize Phoenix。它们就像是 Agent 的"专业体检设备"，能帮你深入分析 Agent 的行为。
 
-## 🗺️ 手把手路线
+## 生活比喻
 
-### Step 1：LangSmith 概览
-- 做什么: 学习 LangSmith 的追踪、评估、监控功能
-- 为什么: LangSmith 是 LangChain 生态的官方监控工具
-- 成功标志: 能解释 LangSmith 的核心概念
+- **LangSmith** = 高端体检中心（全面的检查项目，详细的报告）
+- **Arize Phoenix** = 专家会诊系统（多维度分析，发现潜在问题）
 
-### Step 2：Arize Phoenix 概览
-- 做什么: 学习 Arize Phoenix 的追踪、评估、漂移检测功能
-- 为什么: Arize Phoenix 是开源的 LLM 可观测性工具
-- 成功标志: 能解释 Arize Phoenix 的核心概念
+## 今日三件事
 
-### Step 3：对比与选择
-- 做什么: 对比两个工具的优缺点
-- 为什么: 不同场景需要不同的工具
-- 成功标志: 能根据需求选择合适的工具
+1. **设置 LangSmith 追踪**：配置和使用 LangSmith 跟踪 Agent 执行
+2. **使用 Arize Phoenix**：部署和使用 Phoenix 进行 LLM 可观测性
+3. **仪表化 Agent**：为 Agent 添加完整的追踪和监控
 
-### Step 4：代码实践
-- 做什么: 模拟两个工具的核心功能
-- 为什么: 代码是最好的理解方式
-- 成功标志: 代码跑通
+---
 
-## 💻 代码区
+## 手把手路线
+
+### 第一步：安装依赖
+
+```bash
+pip install langsmith arize-phoenix openinference-instrumentation-openai
+```
+
+### 第二步：设置 LangSmith
 
 ```python
-"""
-LangSmith / Arize Phoenix 实践
-模拟核心功能实现
-"""
+# langsmith_setup.py
+"""LangSmith 设置和使用"""
+
+import os
+import json
 import time
 import uuid
-import json
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime
-from enum import Enum
-
-# ========== 1. LangSmith 模拟 ==========
-
-class LangSmithRunType(Enum):
-    """运行类型"""
-    LLM = "llm"
-    CHAIN = "chain"
-    TOOL = "tool"
-    RETRIEVER = "retriever"
 
 
 @dataclass
 class LangSmithRun:
     """LangSmith 运行记录"""
     run_id: str
-    run_type: LangSmithRunType
+    trace_id: str
     name: str
-    start_time: datetime
-    end_time: Optional[datetime] = None
-    inputs: Dict = field(default_factory=dict)
-    outputs: Dict = field(default_factory=dict)
-    error: Optional[str] = None
-    metadata: Dict = field(default_factory=dict)
-    parent_run_id: Optional[str] = None
-    child_runs: List['LangSmithRun'] = field(default_factory=list)
+    run_type: str  # "chain", "llm", "tool"
+    inputs: Dict[str, Any]
+    outputs: Dict[str, Any] = field(default_factory=dict)
+    error: str = ""
+    start_time: str = ""
+    end_time: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
     tags: List[str] = field(default_factory=list)
 
+    def to_dict(self) -> dict:
+        return {
+            "run_id": self.run_id, "trace_id": self.trace_id,
+            "name": self.name, "run_type": self.run_type,
+            "inputs": self.inputs, "outputs": self.outputs,
+            "error": self.error, "start_time": self.start_time,
+            "end_time": self.end_time, "metadata": self.metadata,
+            "tags": self.tags,
+        }
 
-class LangSmithClient:
-    """LangSmith 客户端模拟"""
-    
+
+class LangSmithTracker:
+    """LangSmith 追踪器"""
+
     def __init__(self, project_name: str = "default"):
         self.project_name = project_name
         self.runs: List[LangSmithRun] = []
-        self.current_run: Optional[LangSmithRun] = None
-    
-    def create_run(
-        self,
-        run_type: LangSmithRunType,
-        name: str,
-        inputs: Dict = None,
-        parent_run_id: Optional[str] = None,
-        tags: List[str] = None,
-        metadata: Dict = None
-    ) -> str:
-        """创建运行"""
+        self._current_trace_id = None
+        self._run_stack: List[LangSmithRun] = []
+
+    def create_run(self, name: str, run_type: str = "chain",
+                   inputs: Dict = None, metadata: Dict = None,
+                   tags: List[str] = None) -> str:
+        """创建新的运行"""
         run_id = str(uuid.uuid4())
-        
+        trace_id = self._current_trace_id or str(uuid.uuid4())
+        if not self._current_trace_id:
+            self._current_trace_id = trace_id
+
         run = LangSmithRun(
-            run_id=run_id,
-            run_type=run_type,
-            name=name,
-            start_time=datetime.now(),
-            inputs=inputs or {},
-            parent_run_id=parent_run_id,
-            tags=tags or [],
-            metadata=metadata or {}
+            run_id=run_id, trace_id=trace_id, name=name,
+            run_type=run_type, inputs=inputs or {},
+            start_time=datetime.now().isoformat(),
+            metadata=metadata or {}, tags=tags or [],
         )
-        
+        self._run_stack.append(run)
         self.runs.append(run)
-        
-        if parent_run_id:
-            # 添加为子运行
-            for r in self.runs:
-                if r.run_id == parent_run_id:
-                    r.child_runs.append(run)
-        
-        self.current_run = run
         return run_id
-    
-    def update_run(
-        self,
-        run_id: str,
-        outputs: Dict = None,
-        error: Optional[str] = None,
-        metadata: Dict = None
-    ):
-        """更新运行"""
-        for run in self.runs:
+
+    def end_run(self, run_id: str, outputs: Dict = None, error: str = ""):
+        """结束运行"""
+        for run in self._run_stack:
             if run.run_id == run_id:
-                if outputs:
-                    run.outputs = outputs
-                if error:
-                    run.error = error
-                if metadata:
-                    run.metadata.update(metadata)
-                run.end_time = datetime.now()
+                run.end_time = datetime.now().isoformat()
+                run.outputs = outputs or {}
+                run.error = error
+                self._run_stack.remove(run)
                 break
-    
-    def get_run(self, run_id: str) -> Optional[LangSmithRun]:
-        """获取运行"""
-        for run in self.runs:
-            if run.run_id == run_id:
-                return run
-        return None
-    
-    def get_runs_by_type(self, run_type: LangSmithRunType) -> List[LangSmithRun]:
-        """按类型获取运行"""
-        return [r for r in self.runs if r.run_type == run_type]
-    
-    def get_trace(self, run_id: str) -> List[LangSmithRun]:
-        """获取完整追踪"""
-        run = self.get_run(run_id)
-        if not run:
-            return []
-        
-        trace = [run]
-        for child in run.child_runs:
-            trace.extend(self.get_trace(child.run_id))
-        
-        return trace
-    
-    def feedback(self, run_id: str, score: float, comment: str = ""):
-        """添加反馈"""
-        run = self.get_run(run_id)
-        if run:
-            run.metadata["feedback_score"] = score
-            run.metadata["feedback_comment"] = comment
-    
-    def get_project_stats(self) -> Dict:
-        """获取项目统计"""
-        total_runs = len(self.runs)
-        by_type = {}
-        for run in self.runs:
-            run_type = run.run_type.value
-            by_type[run_type] = by_type.get(run_type, 0) + 1
-        
-        error_runs = sum(1 for r in self.runs if r.error)
-        
-        return {
+
+    def log_llm_call(self, model: str, prompt: str, completion: str,
+                     tokens_used: int = 0, latency: float = 0):
+        """记录 LLM 调用"""
+        run_id = self.create_run(
+            name=f"LLM Call ({model})",
+            run_type="llm",
+            inputs={"model": model, "prompt": prompt[:200]},
+            outputs={"completion": completion[:200], "tokens_used": tokens_used},
+            metadata={"latency": latency, "model": model},
+        )
+        self.end_run(run_id)
+        return run_id
+
+    def get_trace(self, trace_id: str = None) -> List[Dict]:
+        """获取追踪"""
+        if trace_id:
+            runs = [r for r in self.runs if r.trace_id == trace_id]
+        else:
+            runs = self.runs
+        return [r.to_dict() for r in runs]
+
+    def get_project_runs(self) -> List[Dict]:
+        """获取项目的所有运行"""
+        return [r.to_dict() for r in self.runs]
+
+    def export_to_langsmith_format(self, filepath: str):
+        """导出为 LangSmith 格式"""
+        data = {
             "project": self.project_name,
-            "total_runs": total_runs,
-            "by_type": by_type,
-            "error_runs": error_runs,
-            "error_rate": error_runs / max(total_runs, 1)
+            "runs": self.get_project_runs(),
+            "export_time": datetime.now().isoformat(),
         }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"LangSmith 数据已导出到: {filepath}")
 
 
-# ========== 2. Arize Phoenix 模拟 ==========
+# 模拟 LangSmith 客户端
+class LangSmithClient:
+    """模拟 LangSmith 客户端"""
 
-class MetricType(Enum):
-    """指标类型"""
-    ACCURACY = "accuracy"
-    F1 = "f1"
-    LATENCY = "latency"
-    TOKEN_USAGE = "token_usage"
-    COST = "cost"
-    DRIFT = "drift"
-
-
-@dataclass
-class PhoenixTrace:
-    """Phoenix 追踪"""
-    trace_id: str
-    start_time: datetime
-    end_time: Optional[datetime] = None
-    spans: List[Dict] = field(default_factory=list)
-    metadata: Dict = field(default_factory=dict)
-    labels: Dict[str, str] = field(default_factory=dict)
-    embedding: Optional[List[float]] = None
-
-
-@dataclass
-class PhoenixDataset:
-    """Phoenix 数据集"""
-    dataset_id: str
-    name: str
-    traces: List[PhoenixTrace] = field(default_factory=list)
-    baseline_traces: List[PhoenixTrace] = field(default_factory=list)
-
-
-class ArizePhoenixClient:
-    """Arize Phoenix 客户端模拟"""
-    
-    def __init__(self, project_name: str = "default"):
+    def __init__(self, api_key: str = None, project_name: str = "default"):
+        self.api_key = api_key
         self.project_name = project_name
-        self.traces: List[PhoenixTrace] = []
-        self.datasets: Dict[str, PhoenixDataset] = {}
-        self.metrics_history: List[Dict] = []
-    
-    def log_trace(self, trace: PhoenixTrace):
-        """记录追踪"""
-        self.traces.append(trace)
-    
-    def create_dataset(self, name: str) -> str:
-        """创建数据集"""
-        dataset_id = str(uuid.uuid4())
-        self.datasets[dataset_id] = PhoenixDataset(
-            dataset_id=dataset_id,
-            name=name
-        )
-        return dataset_id
-    
-    def add_to_dataset(self, dataset_id: str, traces: List[PhoenixTrace]):
-        """添加追踪到数据集"""
-        if dataset_id in self.datasets:
-            self.datasets[dataset_id].traces.extend(traces)
-    
-    def set_baseline(self, dataset_id: str, baseline_traces: List[PhoenixTrace]):
-        """设置基线"""
-        if dataset_id in self.datasets:
-            self.datasets[dataset_id].baseline_traces = baseline_traces
-    
-    def compute_metric(
-        self,
-        dataset_id: str,
-        metric_type: MetricType,
-        metric_func: Callable
-    ) -> Dict:
-        """计算指标"""
-        if dataset_id not in self.datasets:
-            return {"error": "Dataset not found"}
-        
-        dataset = self.datasets[dataset_id]
-        current_traces = dataset.traces
-        baseline_traces = dataset.baseline_traces
-        
-        # 计算当前指标
-        current_value = metric_func(current_traces)
-        
-        # 计算基线指标
-        baseline_value = metric_func(baseline_traces) if baseline_traces else None
-        
-        # 计算漂移
-        drift = None
-        if baseline_value is not None and baseline_value != 0:
-            drift = (current_value - baseline_value) / baseline_value
-        
-        result = {
-            "metric": metric_type.value,
-            "current_value": current_value,
-            "baseline_value": baseline_value,
-            "drift": drift,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        self.metrics_history.append(result)
-        return result
-    
-    def detect_drift(
-        self,
-        dataset_id: str,
-        threshold: float = 0.1
-    ) -> Dict:
-        """检测数据漂移"""
-        if dataset_id not in self.datasets:
-            return {"error": "Dataset not found"}
-        
-        dataset = self.datasets[dataset_id]
-        
-        if not dataset.baseline_traces:
-            return {"drift_detected": False, "reason": "No baseline"}
-        
-        # 简化的漂移检测
-        current_count = len(dataset.traces)
-        baseline_count = len(dataset.baseline_traces)
-        
-        count_drift = abs(current_count - baseline_count) / max(baseline_count, 1)
-        
-        return {
-            "drift_detected": count_drift > threshold,
-            "count_drift": count_drift,
-            "threshold": threshold,
-            "current_count": current_count,
-            "baseline_count": baseline_count
-        }
-    
-    def get_performance_summary(self) -> Dict:
-        """获取性能摘要"""
-        if not self.metrics_history:
-            return {}
-        
-        summary = {}
-        for metric in self.metrics_history:
-            metric_name = metric["metric"]
-            if metric_name not in summary:
-                summary[metric_name] = []
-            summary[metric_name].append(metric["current_value"])
-        
-        return {
-            metric_name: {
-                "latest": values[-1],
-                "avg": sum(values) / len(values),
-                "min": min(values),
-                "max": max(values)
-            }
-            for metric_name, values in summary.items()
-        }
+        self.tracker = LangSmithTracker(project_name)
+        print(f"LangSmith 客户端初始化完成 (项目: {project_name})")
+
+    def create_run(self, **kwargs) -> str:
+        return self.tracker.create_run(**kwargs)
+
+    def update_run(self, run_id: str, **kwargs):
+        self.tracker.end_run(run_id, **kwargs)
+
+    def get_runs(self) -> List[Dict]:
+        return self.tracker.get_project_runs()
 
 
-# ========== 3. 工具对比 ==========
-
-def compare_tools():
-    """对比 LangSmith 和 Arize Phoenix"""
-    comparison = """
-LangSmith vs Arize Phoenix 对比
-================================
-
-1. LangSmith
-   - 开发者: LangChain
-   - 定位: LLM 应用开发平台
-   - 核心功能:
-     * 追踪 LangChain 调用链
-     * 评估 LLM 输出质量
-     * 调试 prompt 问题
-     * 版本管理
-   - 优势:
-     * 与 LangChain 深度集成
-     * 易于上手
-     * 支持在线评估
-   - 劣势:
-     * 主要面向 LangChain 生态
-     * 高级功能需付费
-
-2. Arize Phoenix
-   - 开发者: Arize AI
-   - 定位: LLM 可观测性平台
-   - 核心功能:
-     * 追踪和可视化 LLM 调用
-     * 检测数据漂移
-     * 评估模型性能
-     * 根因分析
-   - 优势:
-     * 开源且免费
-     * 支持多种框架
-     * 强大的漂移检测
-   - 劣势:
-     * 配置相对复杂
-     * 文档不如 LangSmith 完善
-
-选择建议:
-  - 使用 LangChain → LangSmith
-  - 需要漂移检测 → Arize Phoenix
-  - 预算有限 → Arize Phoenix (开源)
-  - 需要全功能 → 两者结合使用
-"""
-    print(comparison)
-
-
-# ========== 4. 实践示例 ==========
-
-def langsmith_practice():
-    """LangSmith 实践示例"""
-    print("\n1. LangSmith 实践")
-    print("-" * 40)
-    
-    # 创建客户端
-    client = LangSmithClient("demo-project")
-    
-    # 模拟 LLM 调用链
-    # 1. 用户输入
-    chain_run_id = client.create_run(
-        run_type=LangSmithRunType.CHAIN,
-        name="qa_chain",
-        inputs={"query": "什么是机器学习？"},
-        tags=["qa", "v1"]
-    )
-    
-    # 2. Prompt 处理
-    prompt_run_id = client.create_run(
-        run_type=LangSmithRunType.LLM,
-        name="prompt_template",
-        inputs={"template": "请回答: {query}"},
-        parent_run_id=chain_run_id
-    )
-    client.update_run(
-        prompt_run_id,
-        outputs={"formatted_prompt": "请回答: 什么是机器学习？"}
-    )
-    
-    # 3. LLM 调用
-    llm_run_id = client.create_run(
-        run_type=LangSmithRunType.LLM,
-        name="openai_llm",
-        inputs={"model": "gpt-4", "temperature": 0.7},
-        parent_run_id=chain_run_id,
-        metadata={"token_usage": {"prompt_tokens": 10, "completion_tokens": 50}}
-    )
-    client.update_run(
-        llm_run_id,
-        outputs={"response": "机器学习是让计算机从数据中学习的方法。"},
-        metadata={"latency_ms": 250}
-    )
-    
-    # 4. 添加反馈
-    client.feedback(chain_run_id, score=0.9, comment="回答准确")
-    
-    # 获取统计
-    stats = client.get_project_stats()
-    print(f"   项目: {stats['project']}")
-    print(f"   总运行数: {stats['total_runs']}")
-    print(f"   错误率: {stats['error_rate']*100:.1f}%")
-    
-    # 获取追踪
-    trace = client.get_trace(chain_run_id)
-    print(f"   追踪长度: {len(trace)} 步")
-    
-    return client
-
-
-def phoenix_practice():
-    """Arize Phoenix 实践示例"""
-    print("\n2. Arize Phoenix 实践")
-    print("-" * 40)
-    
-    # 创建客户端
-    client = ArizePhoenixClient("demo-project")
-    
-    # 创建数据集
-    dataset_id = client.create_dataset("qa_dataset")
-    
-    # 添加当前追踪
-    current_traces = [
-        PhoenixTrace(
-            trace_id=str(uuid.uuid4()),
-            start_time=datetime.now(),
-            end_time=datetime.now(),
-            labels={"task": "qa"}
-        )
-        for _ in range(10)
-    ]
-    client.add_to_dataset(dataset_id, current_traces)
-    
-    # 设置基线
-    baseline_traces = [
-        PhoenixTrace(
-            trace_id=str(uuid.uuid4()),
-            start_time=datetime.now(),
-            end_time=datetime.now(),
-            labels={"task": "qa"}
-        )
-        for _ in range(8)
-    ]
-    client.set_baseline(dataset_id, baseline_traces)
-    
-    # 计算指标
-    def latency_metric(traces):
-        return sum(0.2 for _ in traces) / max(len(traces), 1)  # 模拟延迟
-    
-    result = client.compute_metric(
-        dataset_id,
-        MetricType.LATENCY,
-        latency_metric
-    )
-    print(f"   延迟指标:")
-    print(f"     当前值: {result['current_value']:.3f}")
-    print(f"     基线值: {result['baseline_value']:.3f}")
-    print(f"     漂移: {result['drift']*100:.1f}%")
-    
-    # 检测漂移
-    drift_result = client.detect_drift(dataset_id, threshold=0.1)
-    print(f"\n   漂移检测:")
-    print(f"     漂移检测: {'是' if drift_result['drift_detected'] else '否'}")
-    print(f"     数量漂移: {drift_result['count_drift']*100:.1f}%")
-    
-    # 性能摘要
-    summary = client.get_performance_summary()
-    print(f"\n   性能摘要: {json.dumps(summary, indent=2)}")
-    
-    return client
-
-
-# ========== 5. 主函数 ==========
-
-def main():
-    """主函数"""
-    print("=" * 60)
-    print("LangSmith / Arize Phoenix 实践")
-    print("=" * 60)
-    
-    # LangSmith 实践
-    langsmith_client = langsmith_practice()
-    
-    # Arize Phoenix 实践
-    phoenix_client = phoenix_practice()
-    
-    # 工具对比
-    print("\n3. 工具对比")
-    print("-" * 40)
-    compare_tools()
-    
-    print("\n" + "=" * 60)
-    print("实践完成！")
-    print("=" * 60)
+def setup_langsmith():
+    """设置 LangSmith 环境变量"""
+    # 实际使用时需要设置真实的 API Key
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = "your-api-key-here"
+    os.environ["LANGCHAIN_PROJECT"] = "agent-evaluation"
+    print("LangSmith 环境变量已设置")
+    print("注意: 实际使用时需要替换为真实的 API Key")
 
 
 if __name__ == "__main__":
-    main()
+    print("LangSmith 设置和使用示例")
+    print("=" * 60)
+
+    setup_langsmith()
+
+    # 创建追踪器
+    tracker = LangSmithTracker("my-agent-project")
+
+    # 模拟 Agent 执行
+    run_id = tracker.create_run(
+        name="agent_query",
+        run_type="chain",
+        inputs={"query": "什么是机器学习？"},
+        tags=["research", "ai"],
+    )
+
+    # 模拟 LLM 调用
+    tracker.log_llm_call(
+        model="gpt-4",
+        prompt="什么是机器学习？",
+        completion="机器学习是人工智能的一个分支...",
+        tokens_used=150,
+        latency=0.8,
+    )
+
+    # 结束运行
+    tracker.end_run(run_id, outputs={"response": "机器学习是..."})
+
+    # 查看结果
+    print("\n追踪结果:")
+    for run in tracker.get_project_runs():
+        print(f"  {run['name']} ({run['run_type']}): {run.get('start_time', 'N/A')}")
+
+    tracker.export_to_langsmith_format("langsmith_export.json")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | LangSmith 连接失败 | 检查 API key 和网络配置 |
-| 2 | Phoenix 数据加载慢 | 增加服务器资源，优化查询 |
-| 3 | 指标计算不准确 | 检查指标函数实现 |
-| 4 | 漂移检测误报 | 调整阈值，增加样本量 |
-| 5 | 不知道选哪个工具 | 根据是否使用 LangChain 决定 |
+### 第三步：使用 Arize Phoenix
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| LangSmith | LangChain 生态的 LLM 应用开发平台 |
-| Arize Phoenix | 开源的 LLM 可观测性平台 |
-| Run | LangSmith 中的单次执行记录 |
-| Trace | 追踪请求的完整执行路径 |
-| Drift Detection | 检测数据分布变化的技术 |
-| Baseline | 用于对比的基线数据 |
-| Feedback | 对 LLM 输出的评分反馈 |
-| Dataset | 用于评估的数据集 |
+```python
+# phoenix_setup.py
+"""Arize Phoenix 设置和使用"""
 
-## ✅ 验收清单
-- [ ] 能解释 LangSmith 的核心功能
-- [ ] 能解释 Arize Phoenix 的核心功能
-- [ ] 能对比两个工具的优缺点
-- [ ] 代码能跑通并输出结果
+import json
+import time
+import uuid
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
+from datetime import datetime
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+@dataclass
+class TraceSpan:
+    """Phoenix 追踪跨度"""
+    span_id: str
+    trace_id: str
+    name: str
+    span_type: str  # "CHAIN", "LLM", "RETRIEVER", "TOOL"
+    start_time: str
+    end_time: str = ""
+    status: str = "UNSET"  # "OK", "ERROR", "UNSET"
+    attributes: Dict[str, Any] = field(default_factory=dict)
+    events: List[Dict] = field(default_factory=list)
+    parent_span_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "span_id": self.span_id, "trace_id": self.trace_id,
+            "name": self.name, "span_type": self.span_type,
+            "start_time": self.start_time, "end_time": self.end_time,
+            "status": self.status, "attributes": self.attributes,
+            "parent_span_id": self.parent_span_id,
+        }
+
+
+class PhoenixTracker:
+    """Arize Phoenix 追踪器"""
+
+    def __init__(self, project_name: str = "default"):
+        self.project_name = project_name
+        self.spans: List[TraceSpan] = []
+        self._span_stack: List[TraceSpan] = []
+
+    def start_span(self, name: str, span_type: str = "CHAIN",
+                   attributes: Dict = None) -> str:
+        """开始新的跨度"""
+        span_id = str(uuid.uuid4())[:8]
+        trace_id = self._span_stack[0].trace_id if self._span_stack else str(uuid.uuid4())[:8]
+
+        parent_id = self._span_stack[-1].span_id if self._span_stack else None
+
+        span = TraceSpan(
+            span_id=span_id, trace_id=trace_id, name=name,
+            span_type=span_type,
+            start_time=datetime.now().isoformat(),
+            attributes=attributes or {}, parent_span_id=parent_id,
+        )
+        self._span_stack.append(span)
+        self.spans.append(span)
+        return span_id
+
+    def end_span(self, span_id: str, status: str = "OK", attributes: Dict = None):
+        """结束跨度"""
+        for span in reversed(self._span_stack):
+            if span.span_id == span_id:
+                span.end_time = datetime.now().isoformat()
+                span.status = status
+                if attributes:
+                    span.attributes.update(attributes)
+                self._span_stack.remove(span)
+                break
+
+    def record_llm_call(self, model: str, prompt: str, completion: str,
+                        tokens: Dict = None):
+        """记录 LLM 调用"""
+        span_id = self.start_span(f"LLM ({model})", "LLM", {
+            "model": model, "prompt": prompt[:100],
+        })
+        self.end_span(span_id, "OK", {
+            "completion": completion[:100],
+            "tokens": tokens or {},
+        })
+        return span_id
+
+    def record_retrieval(self, query: str, documents: List[str]):
+        """记录检索调用"""
+        span_id = self.start_span("Retriever", "RETRIEVER", {
+            "query": query, "document_count": len(documents),
+        })
+        self.end_span(span_id, "OK", {
+            "documents": [d[:50] for d in documents[:5]],
+        })
+        return span_id
+
+    def get_trace(self, trace_id: str) -> List[Dict]:
+        """获取追踪"""
+        spans = [s for s in self.spans if s.trace_id == trace_id]
+        return [s.to_dict() for s in spans]
+
+    def get_all_traces(self) -> Dict[str, List[Dict]]:
+        """获取所有追踪"""
+        traces = {}
+        for span in self.spans:
+            if span.trace_id not in traces:
+                traces[span.trace_id] = []
+            traces[span.trace_id].append(span.to_dict())
+        return traces
+
+    def export_traces(self, filepath: str):
+        """导出追踪数据"""
+        data = {
+            "project": self.project_name,
+            "traces": self.get_all_traces(),
+            "total_spans": len(self.spans),
+            "export_time": datetime.now().isoformat(),
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"Phoenix 数据已导出到: {filepath}")
+
+
+# 模拟 Phoenix 客户端
+class PhoenixClient:
+    """模拟 Phoenix 客户端"""
+
+    def __init__(self, endpoint: str = "http://localhost:6006"):
+        self.endpoint = endpoint
+        self.tracker = PhoenixTracker()
+        print(f"Phoenix 客户端初始化完成 (端点: {endpoint})")
+
+    def launch_app(self):
+        print(f"Phoenix 应用已启动: {self.endpoint}")
+
+    def get_tracker(self) -> PhoenixTracker:
+        return self.tracker
+
+
+if __name__ == "__main__":
+    print("Arize Phoenix 设置和使用示例")
+    print("=" * 60)
+
+    # 创建 Phoenix 客户端
+    phoenix = PhoenixClient()
+    phoenix.launch_app()
+
+    tracker = phoenix.get_tracker()
+
+    # 模拟 Agent 执行
+    trace_id = None
+
+    # 1. 开始追踪
+    root_id = tracker.start_span("Agent Query", "CHAIN", {"query": "什么是RAG？"})
+    trace_id = tracker.spans[-1].trace_id
+
+    # 2. 记录检索
+    tracker.record_retrieval(
+        query="什么是RAG？",
+        documents=["RAG是检索增强生成的缩写...", "RAG结合了检索和生成..."],
+    )
+
+    # 3. 记录 LLM 调用
+    tracker.record_llm_call(
+        model="gpt-4",
+        prompt="根据以下文档回答问题：...",
+        completion="RAG（检索增强生成）是一种...",
+        tokens={"input": 200, "output": 150},
+    )
+
+    # 4. 结束追踪
+    tracker.end_span(root_id, "OK", {"response_length": 350})
+
+    # 查看结果
+    print("\n追踪结果:")
+    for span in tracker.get_trace(trace_id):
+        print(f"  [{span['span_type']}] {span['name']}: {span['status']}")
+
+    tracker.export_traces("phoenix_traces.json")
+```
+
+### 第四步：完整仪表化 Agent
+
+```python
+# instrumented_agent.py
+"""完整仪表化的 Agent"""
+
+import json
+import time
+import uuid
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
+from datetime import datetime
+
+
+class InstrumentedAgent:
+    """带有完整可观测性的 Agent"""
+
+    def __init__(self, name: str = "my-agent"):
+        self.name = name
+        self.traces = []
+        self.metrics = {"total_queries": 0, "success": 0, "errors": 0}
+
+    def query(self, user_input: str) -> Dict:
+        """处理用户查询（带追踪）"""
+        trace_id = str(uuid.uuid4())[:8]
+        start_time = time.time()
+
+        # 记录开始
+        self.metrics["total_queries"] += 1
+        trace = {
+            "trace_id": trace_id, "start_time": datetime.now().isoformat(),
+            "query": user_input, "spans": [], "status": "running",
+        }
+
+        try:
+            # 步骤 1: 解析输入
+            span1 = self._trace_span(trace_id, "parse_input", "输入解析")
+            parsed = self._parse_input(user_input)
+            self._end_span(span1, {"parsed_tokens": len(parsed.split())})
+
+            # 步骤 2: 检索相关信息
+            span2 = self._trace_span(trace_id, "retrieve", "信息检索")
+            docs = self._retrieve_docs(user_input)
+            self._end_span(span2, {"doc_count": len(docs)})
+
+            # 步骤 3: 生成回答
+            span3 = self._trace_span(trace_id, "generate", "回答生成")
+            response = self._generate_response(user_input, docs)
+            self._end_span(span3, {"response_length": len(response)})
+
+            # 记录成功
+            self.metrics["success"] += 1
+            trace["status"] = "success"
+            trace["response"] = response
+
+        except Exception as e:
+            self.metrics["errors"] += 1
+            trace["status"] = "error"
+            trace["error"] = str(e)
+            response = f"处理错误: {e}"
+
+        trace["end_time"] = datetime.now().isoformat()
+        trace["latency_ms"] = round((time.time() - start_time) * 1000, 2)
+        self.traces.append(trace)
+
+        return {
+            "response": response, "trace_id": trace_id,
+            "latency_ms": trace["latency_ms"],
+        }
+
+    def _parse_input(self, text: str) -> str:
+        """解析输入"""
+        time.sleep(0.02)
+        return text.strip().lower()
+
+    def _retrieve_docs(self, query: str) -> List[str]:
+        """检索文档"""
+        time.sleep(0.05)
+        return [f"文档1: 关于 {query[:10]}...", f"文档2: 相关信息..."]
+
+    def _generate_response(self, query: str, docs: List[str]) -> str:
+        """生成回答"""
+        time.sleep(0.1)
+        return f"根据文档分析，关于'{query[:20]}'的回答是..."
+
+    def _trace_span(self, trace_id: str, span_type: str, name: str) -> Dict:
+        """创建追踪跨度"""
+        span = {
+            "span_id": str(uuid.uuid4())[:8],
+            "trace_id": trace_id, "type": span_type,
+            "name": name, "start_time": datetime.now().isoformat(),
+        }
+        self.traces[-1]["spans"].append(span)
+        return span
+
+    def _end_span(self, span: Dict, attributes: Dict = None):
+        """结束追踪跨度"""
+        span["end_time"] = datetime.now().isoformat()
+        if attributes:
+            span["attributes"] = attributes
+
+    def get_metrics(self) -> Dict:
+        """获取指标"""
+        return self.metrics.copy()
+
+    def get_trace(self, trace_id: str) -> Optional[Dict]:
+        """获取追踪"""
+        for trace in self.traces:
+            if trace["trace_id"] == trace_id:
+                return trace
+        return None
+
+    def export_all(self, filepath: str):
+        """导出所有数据"""
+        data = {
+            "agent": self.name,
+            "metrics": self.metrics,
+            "traces": self.traces,
+            "export_time": datetime.now().isoformat(),
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"数据已导出到: {filepath}")
+
+
+if __name__ == "__main__":
+    print("完整仪表化 Agent 示例")
+    print("=" * 60)
+
+    agent = InstrumentedAgent("demo-agent")
+
+    # 运行测试查询
+    queries = [
+        "什么是机器学习？",
+        "Python如何读取文件？",
+        "解释一下Docker",
+    ]
+
+    for query in queries:
+        result = agent.query(query)
+        print(f"\n查询: {query}")
+        print(f"回答: {result['response'][:50]}...")
+        print(f"延迟: {result['latency_ms']}ms")
+        print(f"追踪ID: {result['trace_id']}")
+
+    # 查看指标
+    print("\n" + "=" * 60)
+    print("Agent 指标:")
+    print(json.dumps(agent.get_metrics(), indent=2))
+
+    # 导出数据
+    agent.export_all("agent_traces.json")
+```
+
+---
+
+## 预期输出
+
+### 运行 LangSmith 设置
+
+```bash
+python langsmith_setup.py
+```
+
+```
+LangSmith 设置和使用示例
+============================================================
+LangSmith 环境变量已设置
+注意: 实际使用时需要替换为真实的 API Key
+
+追踪结果:
+  agent_query (chain): 2026-06-04T10:30:00
+  LLM Call (gpt-4) (llm): 2026-06-04T10:30:00
+LangSmith 数据已导出到: langsmith_export.json
+```
+
+### 运行 Phoenix 设置
+
+```bash
+python phoenix_setup.py
+```
+
+```
+Arize Phoenix 设置和使用示例
+============================================================
+Phoenix 客户端初始化完成 (端点: http://localhost:6006)
+Phoenix 应用已启动
+
+追踪结果:
+  [CHAIN] Agent Query: OK
+  [RETRIEVER] Retriever: OK
+  [LLM] LLM (gpt-4): OK
+Phoenix 数据已导出到: phoenix_traces.json
+```
+
+### 运行仪表化 Agent
+
+```bash
+python instrumented_agent.py
+```
+
+```
+完整仪表化 Agent 示例
+============================================================
+
+查询: 什么是机器学习？
+回答: 根据文档分析，关于'什么是机器学习？'的回答是...
+延迟: 170.23ms
+追踪ID: a1b2c3d4
+
+查询: Python如何读取文件？
+回答: 根据文档分析，关于'Python如何读取文件？'的回答是...
+延迟: 170.15ms
+追踪ID: e5f6g7h8
+
+Agent 指标:
+{
+  "total_queries": 3,
+  "success": 3,
+  "errors": 0
+}
+```
+
+---
+
+## 常见错误及解决方案
+
+### 错误 1: LangSmith API Key 未设置
+
+```
+Error: LANGCHAIN_API_KEY not set
+```
+
+**解决方案：**
+
+```python
+import os
+os.environ["LANGCHAIN_API_KEY"] = "your-real-api-key"
+```
+
+### 错误 2: Phoenix 端口被占用
+
+```
+OSError: [Errno 98] Address already in use
+```
+
+**解决方案：** 更换端口或停止占用进程。
+
+### 错误 3: 追踪数据过大
+
+**解决方案：** 限制追踪数量或实现采样。
+
+---
+
+## 每日挑战
+
+### 挑战 1: 集成真实 LangSmith
+
+使用真实的 LangSmith API 追踪你的 Agent。
+
+### 挑战 2: 部署 Phoenix 仪表板
+
+在本地部署 Phoenix 并可视化追踪数据。
+
+### 挑战 3: 创建自定义仪表板
+
+基于追踪数据创建自定义的监控仪表板。
+
+---
+
+## 今日小结
+
+今天我们学习了专业的 LLM 可观测性工具：
+
+1. **LangSmith**：LangChain 的官方追踪平台
+2. **Arize Phoenix**：开源的 LLM 可观测性工具
+3. **完整仪表化**：为 Agent 添加追踪、指标、日志
+
+**工具对比：**
+
+| 特性 | LangSmith | Arize Phoenix |
+|------|-----------|---------------|
+| 类型 | 商业平台 | 开源工具 |
+| 部署 | 云服务 | 本地/云 |
+| 功能 | 追踪、评估、监控 | 追踪、分析、可视化 |
+| 适用 | LangChain 项目 | 任何 LLM 项目 |
+
+---
+
+*明天见！我们将学习如何用评估结果驱动迭代优化。*

@@ -1,468 +1,881 @@
-# 📅 Week 2 Day 2：路由设计 + 请求验证 + 错误处理
+# Day 2: 路由设计 + 请求验证 + 错误处理
 
-## 🧭 今日方向
-> 今天我们将深入学习 FastAPI 的路由设计、请求验证和错误处理机制，构建更加健壮的 API。
+## 今日学习目标
 
-## 🎯 生享比喻
-> 路由设计就像城市的交通规划，请求验证是安检系统，错误处理是应急预案。三者结合才能让 API 安全、高效地运行。
-
-## 📋 今日三件事
-1. 设计 RESTful 风格的路由
-2. 实现复杂的请求验证
+1. 掌握 RESTful 路由设计原则
+2. 实现复杂的请求验证逻辑
 3. 构建全局错误处理系统
+4. 创建完整的 CRUD API 示例
+5. 理解 HTTP 方法和状态码的正确使用
 
-## 🗺️ 手把手路线
+---
 
-### Step 1: 路由设计
-- **做什么**: 设计符合 RESTful 规范的路由结构
-- **为什么**: 好的路由设计让 API 更易理解和使用
-- **成功标志**: 路由结构清晰、语义明确
+## 第一部分：RESTful 路由设计
 
-### Step 2: 请求验证
-- **做什么**: 实现复杂的请求参数验证
-- **为什么**: 严格的验证防止无效数据进入系统
-- **成功标志**: 能处理各种验证场景
+### 什么是 RESTful？
 
-### Step 3: 错误处理
-- **做什么**: 构建全局错误处理和自定义异常
-- **为什么**: 统一的错误处理让 API 更专业
-- **成功标志**: 错误响应格式统一、信息明确
+**类比理解：**
+RESTful 就像餐厅的菜单设计：
+- GET `/dishes` = 看菜单（获取所有菜品）
+- POST `/orders` = 下单（创建新订单）
+- GET `/orders/123` = 查看订单状态
+- PUT `/orders/123` = 修改订单
+- DELETE `/orders/123` = 取消订单
 
-## 💻 代码区
+### HTTP 方法对照表
+
+| 方法 | 用途 | 幂等性 | 安全性 | 示例 |
+|------|------|--------|--------|------|
+| GET | 获取资源 | 是 | 是 | 获取用户列表 |
+| POST | 创建资源 | 否 | 否 | 创建新用户 |
+| PUT | 替换资源 | 是 | 否 | 更新整个用户信息 |
+| PATCH | 部分更新 | 否 | 否 | 修改用户邮箱 |
+| DELETE | 删除资源 | 是 | 否 | 删除用户 |
+
+### 状态码使用规范
 
 ```python
-# RESTful 路由设计
+# 状态码分类
+"""
+2xx 成功
+200 OK - 请求成功
+201 Created - 创建成功
+204 No Content - 删除成功，无返回内容
 
-from fastapi import FastAPI, HTTPException, Query, Path, Body
-from pydantic import BaseModel, Field
-from typing import Optional, List
+3xx 重定向
+301 Moved Permanently - 永久重定向
+304 Not Modified - 资源未修改
+
+4xx 客户端错误
+400 Bad Request - 请求格式错误
+401 Unauthorized - 未认证
+403 Forbidden - 无权限
+404 Not Found - 资源不存在
+409 Conflict - 冲突（如用户名已存在）
+422 Unprocessable Entity - 验证失败
+
+5xx 服务端错误
+500 Internal Server Error - 服务器内部错误
+502 Bad Gateway - 网关错误
+503 Service Unavailable - 服务不可用
+"""
+```
+
+---
+
+## 第二部分：完整 CRUD API 示例
+
+### 文件：app/main.py（完整代码）
+
+```python
+"""
+Agent Factory API - 完整 CRUD 示例
+"""
+
+from fastapi import FastAPI, HTTPException, Query, Path, Body, status
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, List, Dict, Any
+from datetime import datetime
 from enum import Enum
+import re
 
-app = FastAPI(title="Agent Factory API - 路由设计示例")
+# 创建应用
+app = FastAPI(
+    title="Agent Factory API",
+    description="智能体工厂的后端 API 服务",
+    version="0.1.0"
+)
 
-# 枚举类型
+
+# ==================== 数据模型 ====================
+
 class TaskStatus(str, Enum):
-    """任务状态"""
+    """任务状态枚举"""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
+
 class TaskPriority(int, Enum):
-    """任务优先级"""
+    """任务优先级枚举"""
     LOW = 1
     MEDIUM = 2
     HIGH = 3
+    URGENT = 4
 
-# 数据模型
-class TaskBase(BaseModel):
-    """任务基础模型"""
-    title: str = Field(..., min_length=1, max_length=100, description="任务标题")
-    description: Optional[str] = Field(None, max_length=500, description="任务描述")
-    priority: TaskPriority = Field(default=TaskPriority.MEDIUM, description="优先级")
 
-class TaskCreate(TaskBase):
-    """创建任务"""
-    pass
+class TaskCreate(BaseModel):
+    """创建任务的请求模型"""
+    title: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=100,
+        description="任务标题",
+        examples=["学习 FastAPI"]
+    )
+    description: Optional[str] = Field(
+        None, 
+        max_length=500,
+        description="任务描述",
+        examples=["完成 Day 2 的学习内容"]
+    )
+    priority: TaskPriority = Field(
+        default=TaskPriority.MEDIUM,
+        description="任务优先级"
+    )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="任务标签",
+        examples=[["学习", "Python"]]
+    )
+    due_date: Optional[datetime] = Field(
+        None,
+        description="截止日期"
+    )
+
+    @field_validator('title')
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        """验证标题不包含特殊字符"""
+        if re.search(r'[<>{}]', v):
+            raise ValueError('标题不能包含 < > { } 字符')
+        return v.strip()
+
 
 class TaskUpdate(BaseModel):
-    """更新任务"""
+    """更新任务的请求模型（所有字段可选）"""
     title: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
+    tags: Optional[List[str]] = None
+    due_date: Optional[datetime] = None
 
-class TaskResponse(TaskBase):
-    """任务响应"""
-    id: int
-    status: TaskStatus
-    created_at: str
-    updated_at: str
 
-# 模拟数据库
-tasks_db: List[dict] = []
+class TaskResponse(BaseModel):
+    """任务响应模型"""
+    id: int = Field(..., description="任务ID")
+    title: str = Field(..., description="任务标题")
+    description: Optional[str] = Field(None, description="任务描述")
+    status: TaskStatus = Field(..., description="任务状态")
+    priority: TaskPriority = Field(..., description="任务优先级")
+    tags: List[str] = Field(default_factory=list, description="任务标签")
+    due_date: Optional[datetime] = Field(None, description="截止日期")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
 
-# 路由设计 - 任务管理
-@app.get("/api/v1/tasks", response_model=List[TaskResponse])
+    class Config:
+        from_attributes = True
+
+
+class PaginatedResponse(BaseModel):
+    """分页响应模型"""
+    items: List[TaskResponse] = Field(..., description="数据列表")
+    total: int = Field(..., description="总数")
+    page: int = Field(..., description="当前页")
+    page_size: int = Field(..., description="每页数量")
+    total_pages: int = Field(..., description="总页数")
+
+
+# ==================== 模拟数据库 ====================
+
+tasks_db: Dict[int, dict] = {}
+task_id_counter = 1
+
+
+def get_task(task_id: int) -> Optional[dict]:
+    """获取单个任务"""
+    return tasks_db.get(task_id)
+
+
+def get_tasks(
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10
+) -> tuple[List[dict], int]:
+    """获取任务列表（带过滤和分页）"""
+    tasks = list(tasks_db.values())
+    
+    # 按状态过滤
+    if status:
+        tasks = [t for t in tasks if t["status"] == status]
+    
+    # 按优先级过滤
+    if priority:
+        tasks = [t for t in tasks if t["priority"] == priority]
+    
+    # 按标签过滤
+    if tag:
+        tasks = [t for t in tasks if tag in t.get("tags", [])]
+    
+    # 搜索标题
+    if search:
+        tasks = [t for t in tasks if search.lower() in t["title"].lower()]
+    
+    # 计算总数
+    total = len(tasks)
+    
+    # 分页
+    start = (page - 1) * page_size
+    end = start + page_size
+    tasks = tasks[start:end]
+    
+    return tasks, total
+
+
+# ==================== 路由定义 ====================
+
+@app.get("/")
+async def root():
+    """根端点 - API 健康检查"""
+    return {
+        "message": "Agent Factory API",
+        "version": "0.1.0",
+        "status": "running"
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """健康检查端点"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+# ==================== 任务 CRUD ====================
+
+@app.post(
+    "/api/v1/tasks",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="创建新任务",
+    description="创建一个新的任务，返回创建的任务信息",
+    responses={
+        201: {"description": "任务创建成功"},
+        422: {"description": "验证错误"}
+    }
+)
+async def create_task(task: TaskCreate = Body(...)):
+    """
+    创建新任务
+    
+    - **title**: 任务标题（必填，1-100字符）
+    - **description**: 任务描述（可选）
+    - **priority**: 优先级（默认：中）
+    - **tags**: 标签列表（可选）
+    - **due_date**: 截止日期（可选）
+    """
+    global task_id_counter
+    
+    now = datetime.now()
+    new_task = {
+        "id": task_id_counter,
+        "title": task.title,
+        "description": task.description,
+        "status": TaskStatus.PENDING,
+        "priority": task.priority,
+        "tags": task.tags,
+        "due_date": task.due_date,
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    tasks_db[task_id_counter] = new_task
+    task_id_counter += 1
+    
+    return new_task
+
+
+@app.get(
+    "/api/v1/tasks",
+    response_model=PaginatedResponse,
+    summary="获取任务列表",
+    description="获取任务列表，支持过滤、搜索和分页"
+)
 async def list_tasks(
     status: Optional[TaskStatus] = Query(None, description="按状态过滤"),
     priority: Optional[TaskPriority] = Query(None, description="按优先级过滤"),
-    skip: int = Query(0, ge=0, description="跳过数量"),
-    limit: int = Query(10, ge=1, le=100, description="返回数量")
+    tag: Optional[str] = Query(None, description="按标签过滤"),
+    search: Optional[str] = Query(None, description="搜索标题"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=100, description="每页数量")
 ):
     """
     获取任务列表
     
-    支持按状态和优先级过滤，支持分页
+    支持以下过滤和排序：
+    - 按状态过滤
+    - 按优先级过滤
+    - 按标签过滤
+    - 搜索标题
+    - 分页
     """
-    filtered_tasks = tasks_db
+    tasks, total = get_tasks(
+        status=status,
+        priority=priority,
+        tag=tag,
+        search=search,
+        page=page,
+        page_size=page_size
+    )
     
-    # 过滤
-    if status:
-        filtered_tasks = [t for t in filtered_tasks if t["status"] == status]
-    if priority:
-        filtered_tasks = [t for t in filtered_tasks if t["priority"] == priority]
+    total_pages = (total + page_size - 1) // page_size
     
-    # 分页
-    return filtered_tasks[skip:skip + limit]
+    return PaginatedResponse(
+        items=tasks,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
 
-@app.post("/api/v1/tasks", response_model=TaskResponse, status_code=201)
-async def create_task(task: TaskCreate = Body(...)):
-    """创建新任务"""
-    from datetime import datetime
-    
-    new_task = {
-        "id": len(tasks_db) + 1,
-        **task.model_dump(),
-        "status": TaskStatus.PENDING,
-        "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat()
+
+@app.get(
+    "/api/v1/tasks/{task_id}",
+    response_model=TaskResponse,
+    summary="获取单个任务",
+    description="根据任务ID获取任务详情",
+    responses={
+        200: {"description": "任务详情"},
+        404: {"description": "任务不存在"}
     }
-    tasks_db.append(new_task)
-    return new_task
-
-@app.get("/api/v1/tasks/{task_id}", response_model=TaskResponse)
-async def get_task(
+)
+async def get_task_by_id(
     task_id: int = Path(..., title="任务ID", description="任务的唯一标识")
 ):
     """根据ID获取任务"""
-    for task in tasks_db:
-        if task["id"] == task_id:
-            return task
-    raise HTTPException(status_code=404, detail="任务不存在")
+    task = get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
+    return task
 
-@app.put("/api/v1/tasks/{task_id}", response_model=TaskResponse)
+
+@app.put(
+    "/api/v1/tasks/{task_id}",
+    response_model=TaskResponse,
+    summary="更新任务",
+    description="更新任务的所有或部分字段",
+    responses={
+        200: {"description": "任务更新成功"},
+        404: {"description": "任务不存在"},
+        422: {"description": "验证错误"}
+    }
+)
 async def update_task(
     task_id: int,
-    task_update: TaskUpdate
+    task_update: TaskUpdate = Body(...)
 ):
-    """更新任务"""
-    from datetime import datetime
+    """
+    更新任务
     
-    for i, task in enumerate(tasks_db):
-        if task["id"] == task_id:
-            update_data = task_update.model_dump(exclude_unset=True)
-            tasks_db[i].update(update_data)
-            tasks_db[i]["updated_at"] = datetime.now().isoformat()
-            return tasks_db[i]
+    只会更新提供的字段，未提供的字段保持不变。
+    """
+    task = get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
     
-    raise HTTPException(status_code=404, detail="任务不存在")
+    # 只更新提供的字段
+    update_data = task_update.model_dump(exclude_unset=True)
+    task.update(update_data)
+    task["updated_at"] = datetime.now()
+    
+    return task
 
-@app.delete("/api/v1/tasks/{task_id}")
-async def delete_task(task_id: int):
-    """删除任务"""
-    for i, task in enumerate(tasks_db):
-        if task["id"] == task_id:
-            del tasks_db[i]
-            return {"message": "任务已删除"}
-    
-    raise HTTPException(status_code=404, detail="任务不存在")
 
-@app.patch("/api/v1/tasks/{task_id}/status")
+@app.patch(
+    "/api/v1/tasks/{task_id}/status",
+    response_model=TaskResponse,
+    summary="更新任务状态",
+    description="只更新任务的状态字段"
+)
 async def update_task_status(
     task_id: int,
     status: TaskStatus = Body(..., embed=True)
 ):
     """更新任务状态（部分更新）"""
-    from datetime import datetime
+    task = get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
     
-    for i, task in enumerate(tasks_db):
-        if task["id"] == task_id:
-            tasks_db[i]["status"] = status
-            tasks_db[i]["updated_at"] = datetime.now().isoformat()
-            return tasks_db[i]
+    task["status"] = status
+    task["updated_at"] = datetime.now()
     
-    raise HTTPException(status_code=404, detail="任务不存在")
+    return task
+
+
+@app.delete(
+    "/api/v1/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除任务",
+    description="删除指定的任务"
+)
+async def delete_task(
+    task_id: int = Path(..., title="任务ID", description="任务的唯一标识")
+):
+    """删除任务"""
+    if task_id not in tasks_db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
+    
+    del tasks_db[task_id]
+    return None
+
+
+# ==================== 批量操作 ====================
+
+@app.post(
+    "/api/v1/tasks/batch",
+    response_model=List[TaskResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="批量创建任务",
+    description="一次性创建多个任务"
+)
+async def batch_create_tasks(tasks: List[TaskCreate] = Body(...)):
+    """批量创建任务"""
+    global task_id_counter
+    created_tasks = []
+    
+    for task in tasks:
+        now = datetime.now()
+        new_task = {
+            "id": task_id_counter,
+            "title": task.title,
+            "description": task.description,
+            "status": TaskStatus.PENDING,
+            "priority": task.priority,
+            "tags": task.tags,
+            "due_date": task.due_date,
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        tasks_db[task_id_counter] = new_task
+        created_tasks.append(new_task)
+        task_id_counter += 1
+    
+    return created_tasks
+
+
+@app.delete(
+    "/api/v1/tasks/batch",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="批量删除任务",
+    description="根据ID列表批量删除任务"
+)
+async def batch_delete_tasks(task_ids: List[int] = Body(...)):
+    """批量删除任务"""
+    for task_id in task_ids:
+        if task_id in tasks_db:
+            del tasks_db[task_id]
+    
+    return None
+
+
+# ==================== 统计端点 ====================
+
+@app.get(
+    "/api/v1/tasks/stats",
+    summary="获取任务统计",
+    description="获取任务的各种统计数据"
+)
+async def get_task_stats():
+    """获取任务统计信息"""
+    all_tasks = list(tasks_db.values())
+    
+    stats = {
+        "total": len(all_tasks),
+        "by_status": {},
+        "by_priority": {},
+        "by_tag": {}
+    }
+    
+    for task in all_tasks:
+        # 按状态统计
+        status = task["status"].value
+        stats["by_status"][status] = stats["by_status"].get(status, 0) + 1
+        
+        # 按优先级统计
+        priority = task["priority"].value
+        stats["by_priority"][priority] = stats["by_priority"].get(priority, 0) + 1
+        
+        # 按标签统计
+        for tag in task.get("tags", []):
+            stats["by_tag"][tag] = stats["by_tag"].get(tag, 0) + 1
+    
+    return stats
+
+
+# ==================== 错误处理 ====================
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request, exc):
+    """值错误处理器"""
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)}
+    )
+
+
+# ==================== 启动 ====================
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-```python
-# 高级请求验证
+---
 
-from fastapi import FastAPI, Query, Path, Body, Header, Cookie
-from pydantic import BaseModel, Field, validator, model_validator
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date
-import re
+## 第三部分：测试所有端点
 
-app = FastAPI()
+### 创建任务
 
-# 1. 自定义验证器
-class StrongPassword(BaseModel):
-    """强密码模型"""
-    password: str
-    
-    @validator('password')
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('密码长度至少8位')
-        if not re.search(r'[A-Z]', v):
-            raise ValueError('密码必须包含大写字母')
-        if not re.search(r'[a-z]', v):
-            raise ValueError('密码必须包含小写字母')
-        if not re.search(r'\d', v):
-            raise ValueError('密码必须包含数字')
-        return v
-
-# 2. 复杂嵌套验证
-class Address(BaseModel):
-    """地址"""
-    street: str = Field(..., min_length=1)
-    city: str = Field(..., min_length=1)
-    country: str = Field(default="中国")
-    postal_code: Optional[str] = Field(None, regex=r'^\d{6}$')
-
-class UserProfile(BaseModel):
-    """用户资料"""
-    username: str = Field(..., min_length=3, max_length=50)
-    email: str
-    birthday: Optional[date] = None
-    addresses: List[Address] = Field(default_factory=list)
-    preferences: Dict[str, Any] = Field(default_factory=dict)
-    
-    @model_validator(mode='after')
-    def validate_user(self):
-        """模型级验证"""
-        # 验证邮箱格式
-        if '@' not in self.email:
-            raise ValueError('邮箱格式不正确')
-        
-        # 验证生日
-        if self.birthday and self.birthday > date.today():
-            raise ValueError('生日不能是未来日期')
-        
-        return self
-
-# 3. 查询参数验证
-@app.get("/api/v1/search")
-async def search_items(
-    q: str = Query(..., min_length=1, max_length=100, description="搜索关键词"),
-    category: Optional[str] = Query(None, description="分类"),
-    min_price: float = Query(0.0, ge=0, description="最低价格"),
-    max_price: float = Query(float('inf'), ge=0, description="最高价格"),
-    sort_by: str = Query("created_at", regex="^(created_at|price|name)$", description="排序字段"),
-    order: str = Query("desc", regex="^(asc|desc)$", description="排序方向"),
-    page: int = Query(1, ge=1, description="页码"),
-    per_page: int = Query(20, ge=1, le=100, description="每页数量")
-):
-    """
-    搜索物品
-    
-    支持多种过滤和排序选项
-    """
-    return {
-        "query": q,
-        "filters": {
-            "category": category,
-            "min_price": min_price,
-            "max_price": max_price
-        },
-        "sort": {"by": sort_by, "order": order},
-        "pagination": {"page": page, "per_page": per_page}
-    }
-
-# 4. 请求头验证
-@app.get("/api/v1/protected")
-async def protected_endpoint(
-    authorization: str = Header(..., description="认证令牌"),
-    user_agent: str = Header(None, description="用户代理"),
-    x_request_id: Optional[str] = Header(None, description="请求ID")
-):
-    """需要认证的端点"""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="无效的认证格式")
-    
-    return {
-        "message": "访问成功",
-        "token": authorization[7:],
-        "user_agent": user_agent,
-        "request_id": x_request_id
-    }
-
-# 5. Cookie 验证
-@app.get("/api/v1/session")
-async def session_endpoint(
-    session_id: str = Cookie(..., description="会话ID"),
-    csrf_token: Optional[str] = Cookie(None, description="CSRF令牌")
-):
-    """会话验证端点"""
-    return {
-        "session_id": session_id,
-        "csrf_token": csrf_token
-    }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+```bash
+curl -X POST http://localhost:8000/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "学习 FastAPI",
+    "description": "完成 Day 2 的学习内容",
+    "priority": 3,
+    "tags": ["学习", "Python"],
+    "due_date": "2024-01-20T23:59:59"
+  }'
 ```
 
+**预期输出：**
+```json
+{
+  "id": 1,
+  "title": "学习 FastAPI",
+  "description": "完成 Day 2 的学习内容",
+  "status": "pending",
+  "priority": 3,
+  "tags": ["学习", "Python"],
+  "due_date": "2024-01-20T23:59:59",
+  "created_at": "2024-01-15T10:30:00",
+  "updated_at": "2024-01-15T10:30:00"
+}
+```
+
+### 获取任务列表
+
+```bash
+# 获取所有任务
+curl http://localhost:8000/api/v1/tasks
+
+# 按状态过滤
+curl "http://localhost:8000/api/v1/tasks?status=pending"
+
+# 按优先级过滤
+curl "http://localhost:8000/api/v1/tasks?priority=3"
+
+# 搜索
+curl "http://localhost:8000/api/v1/tasks?search=FastAPI"
+
+# 分页
+curl "http://localhost:8000/api/v1/tasks?page=1&page_size=5"
+```
+
+### 更新任务状态
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/tasks/1/status \
+  -H "Content-Type: application/json" \
+  -d '"in_progress"'
+```
+
+### 删除任务
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/tasks/1
+```
+
+### 批量操作
+
+```bash
+# 批量创建
+curl -X POST http://localhost:8000/api/v1/tasks/batch \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"title": "任务1", "priority": 1},
+    {"title": "任务2", "priority": 2},
+    {"title": "任务3", "priority": 3}
+  ]'
+
+# 批量删除
+curl -X DELETE http://localhost:8000/api/v1/tasks/batch \
+  -H "Content-Type: application/json" \
+  -d '[1, 2, 3]'
+```
+
+### 获取统计信息
+
+```bash
+curl http://localhost:8000/api/v1/tasks/stats
+```
+
+---
+
+## 第四部分：错误处理最佳实践
+
+### 自定义异常类
+
 ```python
-# 全局错误处理
+"""
+自定义异常类
+"""
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi import HTTPException, status
 from typing import Any, Optional
-from datetime import datetime
-from enum import Enum
 
-# 自定义异常类
-class ErrorCode(str, Enum):
-    """错误码"""
-    VALIDATION_ERROR = "VALIDATION_ERROR"
-    NOT_FOUND = "NOT_FOUND"
-    UNAUTHORIZED = "UNAUTHORIZED"
-    FORBIDDEN = "FORBIDDEN"
-    RATE_LIMITED = "RATE_LIMITED"
-    INTERNAL_ERROR = "INTERNAL_ERROR"
 
-class APIError(Exception):
+class APIError(HTTPException):
     """API 基础异常"""
     
     def __init__(
         self,
-        code: ErrorCode,
-        message: str,
-        details: Optional[dict] = None,
-        status_code: int = 400
+        status_code: int,
+        detail: str,
+        error_code: Optional[str] = None,
+        headers: Optional[dict] = None
     ):
-        self.code = code
-        self.message = message
-        self.details = details or {}
-        self.status_code = status_code
-        super().__init__(message)
+        super().__init__(status_code=status_code, detail=detail)
+        self.error_code = error_code
+        self.headers = headers
+
 
 class NotFoundError(APIError):
     """未找到错误"""
     
-    def __init__(self, resource: str, resource_id: Any = None):
-        details = {"resource": resource, "id": resource_id}
+    def __init__(self, resource: str, resource_id: Any):
         super().__init__(
-            code=ErrorCode.NOT_FOUND,
-            message=f"{resource} 未找到",
-            details=details,
-            status_code=404
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{resource} ID {resource_id} 不存在",
+            error_code="NOT_FOUND"
         )
+
 
 class ValidationError(APIError):
     """验证错误"""
     
     def __init__(self, field: str, message: str):
-        details = {"field": field}
         super().__init__(
-            code=ErrorCode.VALIDATION_ERROR,
-            message=message,
-            details=details,
-            status_code=422
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"字段 '{field}' 验证失败: {message}",
+            error_code="VALIDATION_ERROR"
         )
 
-# 创建应用
-app = FastAPI(title="Agent Factory API - 错误处理示例")
 
-# 全局异常处理器
-@app.exception_handler(APIError)
-async def api_error_handler(request: Request, exc: APIError):
-    """API 错误处理器"""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "code": exc.code.value,
-                "message": exc.message,
-                "details": exc.details,
-                "timestamp": datetime.now().isoformat(),
-                "path": str(request.url)
-            }
-        }
-    )
-
-@app.exception_handler(Exception)
-async def general_error_handler(request: Request, exc: Exception):
-    """通用错误处理器"""
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": "服务器内部错误",
-                "details": {"exception_type": type(exc).__name__},
-                "timestamp": datetime.now().isoformat(),
-                "path": str(request.url)
-            }
-        }
-    )
-
-# 使用示例端点
-@app.get("/api/v1/items/{item_id}")
-async def get_item(item_id: int):
-    """获取物品"""
-    # 模拟未找到
-    if item_id == 0:
-        raise NotFoundError("物品", item_id)
+class ConflictError(APIError):
+    """冲突错误"""
     
-    # 模拟验证错误
-    if item_id < 0:
-        raise ValidationError("item_id", "物品ID不能为负数")
-    
-    return {"id": item_id, "name": f"物品{item_id}"}
-
-@app.get("/api/v1/error-demo")
-async def error_demo():
-    """错误演示端点"""
-    # 触发不同的错误
-    error_type = "not_found"
-    
-    if error_type == "not_found":
-        raise NotFoundError("用户", 123)
-    elif error_type == "validation":
-        raise ValidationError("email", "邮箱格式不正确")
-    else:
-        raise APIError(
-            code=ErrorCode.RATE_LIMITED,
-            message="请求过于频繁",
-            details={"retry_after": 60},
-            status_code=429
+    def __init__(self, message: str):
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=message,
+            error_code="CONFLICT"
         )
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+
+class UnauthorizedError(APIError):
+    """未授权错误"""
+    
+    def __init__(self, message: str = "未授权访问"):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=message,
+            error_code="UNAUTHORIZED",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+
+class ForbiddenError(APIError):
+    """禁止访问错误"""
+    
+    def __init__(self, message: str = "无权限访问"):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=message,
+            error_code="FORBIDDEN"
+        )
+
+
+class RateLimitError(APIError):
+    """请求频率限制错误"""
+    
+    def __init__(self, retry_after: int = 60):
+        super().__init__(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"请求过于频繁，请 {retry_after} 秒后重试",
+            error_code="RATE_LIMITED",
+            headers={"Retry-After": str(retry_after)}
+        )
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 路由冲突 | 检查路由顺序，具体路由放在前面 |
-| 2 | 验证错误信息不明确 | 使用 Field 的 description 参数 |
-| 3 | 异常处理器不生效 | 确保异常处理器在路由之前定义 |
-| 4 | 嵌套验证失败 | 检查嵌套模型的字段定义 |
+### 全局异常处理器
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| RESTful | 基于 HTTP 的 API 设计风格 |
-| 路由 | URL 到处理函数的映射 |
-| 查询参数 | URL 中 ? 后面的参数 |
-| 路径参数 | URL 路径中的动态部分 |
-| 请求体 | POST/PUT 请求中的数据 |
-| 异常处理 | 捕获和处理错误的机制 |
-| 中间件 | 请求/响应处理管道 |
+```python
+"""
+全局异常处理器
+"""
 
-## ✅ 验收清单
-- [ ] 设计符合 RESTful 规范的路由
-- [ ] 实现复杂的请求验证逻辑
-- [ ] 构建全局错误处理系统
-- [ ] 理解各种验证器的用法
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from datetime import datetime
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+def setup_exception_handlers(app: FastAPI):
+    """设置全局异常处理器"""
+    
+    @app.exception_handler(APIError)
+    async def api_error_handler(request: Request, exc: APIError):
+        """API 错误处理器"""
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": exc.error_code,
+                    "message": exc.detail,
+                    "timestamp": datetime.now().isoformat(),
+                    "path": str(request.url)
+                }
+            },
+            headers=exc.headers
+        )
+    
+    @app.exception_handler(Exception)
+    async def general_error_handler(request: Request, exc: Exception):
+        """通用错误处理器"""
+        # 记录日志
+        print(f"未处理的异常: {type(exc).__name__}: {exc}")
+        
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "服务器内部错误",
+                    "timestamp": datetime.now().isoformat(),
+                    "path": str(request.url)
+                }
+            }
+        )
+```
+
+---
+
+## 第五部分：实战练习
+
+### 练习：创建博客文章 API
+
+创建文件 `app/schemas/article.py`：
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
+
+
+class ArticleStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class ArticleCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200, description="文章标题")
+    content: str = Field(..., min_length=10, description="文章内容")
+    summary: Optional[str] = Field(None, max_length=500, description="文章摘要")
+    tags: List[str] = Field(default_factory=list, description="文章标签")
+    category: str = Field(..., description="文章分类")
+
+
+class ArticleResponse(ArticleCreate):
+    id: int
+    status: ArticleStatus
+    author_id: int
+    view_count: int = 0
+    like_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+    published_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ArticleUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    content: Optional[str] = Field(None, min_length=10)
+    summary: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = None
+    category: Optional[str] = None
+    status: Optional[ArticleStatus] = None
+```
+
+---
+
+## 验证清单
+
+完成今日学习后，检查以下项目：
+
+- [ ] 理解 RESTful 路由设计原则
+- [ ] 能正确使用 HTTP 方法（GET/POST/PUT/PATCH/DELETE）
+- [ ] 能正确使用状态码（200/201/204/400/404/422）
+- [ ] 实现了完整的 CRUD 操作
+- [ ] 实现了分页和过滤功能
+- [ ] 实现了批量操作
+- [ ] 使用了自定义异常类
+- [ ] 实现了全局错误处理器
+- [ ] 完成了至少一个实战练习
+
+---
+
+## 今日小结
+
+| 概念 | 关键点 |
+|------|--------|
+| RESTful | 基于资源的 API 设计风格 |
+| HTTP 方法 | GET/POST/PUT/PATCH/DELETE |
+| 状态码 | 2xx成功/4xx客户端错误/5xx服务端错误 |
+| 路径参数 | 资源的唯一标识 |
+| 查询参数 | 过滤、排序、分页 |
+| 请求体 | 创建/更新的数据 |
+| 分页 | 避免一次返回太多数据 |
+| 批量操作 | 提高效率，减少请求次数 |
+
+---
+
+## 明日预告
+
+明天我们将学习：
+- SQLAlchemy ORM 基础
+- 数据库模型定义
+- 数据库 CRUD 操作
+- FastAPI 与数据库集成
+
+---
+
+## 参考资源
+
+- [RESTful API 设计指南](https://restfulapi.net/)
+- [HTTP 状态码完整列表](https://httpstatuses.com/)
+- [FastAPI 高级用法](https://fastapi.tiangolo.com/advanced/)

@@ -1,127 +1,218 @@
-# 📅 Week 3 Day 1：NLP 基础 + 文本表示演进
+# Day 1: NLP 基础 + 文本表示演进
 
-## 🧭 今日方向
-> 今天我们将进入 LLM 基础学习，从 NLP 的基本概念开始，了解文本表示方法的演进历程。
+## 今日学习目标
 
-## 🎯 生活比喻
-> 如果把语言比作音乐，那么文本表示就是乐谱。从简单的简谱（One-Hot）到复杂的交响乐谱（Embedding），我们见证了"记谱法"的进步。
-
-## 📋 今日三件事
 1. 了解 NLP 的基本概念和应用
 2. 学习文本表示的演进历程
 3. 理解词向量和 Embedding 的原理
+4. 动手实现简单的文本表示方法
+5. 理解现代 NLP 的核心概念
 
-## 🗺️ 手把手路线
+---
 
-### Step 1: NLP 基础
-- **做什么**: 了解自然语言处理的定义、任务和应用
-- **为什么**: NLP 是大模型的技术基础
-- **成功标志**: 能列举 5 个 NLP 应用场景
+## 第一部分：什么是 NLP？
 
-### Step 2: 文本表示方法
-- **做什么**: 学习 One-Hot、TF-IDF、词向量等方法
-- **为什么**: 理解文本如何被计算机处理
-- **成功标志**: 能解释不同文本表示方法的优缺点
+### NLP 定义
 
-### Step 3: Embedding 原理
-- **做什么**: 深入理解词嵌入和句子嵌入
-- **为什么**: Embedding 是现代 NLP 的核心
-- **成功标志**: 能使用预训练模型生成 Embedding
+**类比理解：**
+NLP（自然语言处理）就像教计算机学外语：
+- 计算机原本只懂 0 和 1
+- NLP 让计算机能够"理解"人类语言
+- 就像你学英语一样，计算机也需要学习语言的规律
 
-## 💻 代码区
+### NLP 应用场景
+
+```
+日常应用：
+├── 搜索引擎（理解搜索意图）
+├── 语音助手（Siri、小爱同学）
+├── 机器翻译（Google 翻译）
+├── 情感分析（评论分析）
+├── 文本摘要（新闻摘要）
+├── 问答系统（智能客服）
+├── 代码生成（GitHub Copilot）
+└── 对话系统（ChatGPT）
+```
+
+### NLP 处理流程
+
+```
+原始文本
+    ↓
+预处理（分词、去停用词）
+    ↓
+文本表示（向量化）
+    ↓
+模型处理（特征提取、分类）
+    ↓
+输出结果
+```
+
+---
+
+## 第二部分：文本预处理
+
+### 文件：app/nlp/preprocessing.py
 
 ```python
-# NLP 基础概念
+"""
+文本预处理工具
+"""
 
+import re
 from typing import List, Dict
 from collections import Counter
 
-# 1. 文本预处理基础
-def basic_text_preprocessing(text: str) -> Dict[str, any]:
-    """
-    基础文本预处理
-    
-    Args:
-        text: 原始文本
-        
-    Returns:
-        预处理结果
-    """
-    # 转小写
-    text_lower = text.lower()
-    
-    # 简单分词（中文按字分，英文按空格分）
-    if any('一' <= char <= '鿿' for char in text):
-        # 中文文本
-        tokens = list(text)  # 按字分
-    else:
-        # 英文文本
-        tokens = text_lower.split()
-    
-    # 去除标点
-    tokens = [token for token in tokens if token.isalnum()]
-    
-    return {
-        "original": text,
-        "lowercase": text_lower,
-        "tokens": tokens,
-        "token_count": len(tokens),
-        "unique_tokens": list(set(tokens))
-    }
 
-# 2. 词频统计
-def word_frequency_analysis(texts: List[str]) -> Dict[str, int]:
-    """
-    词频分析
+class TextPreprocessor:
+    """文本预处理器"""
     
-    Args:
-        texts: 文本列表
+    def __init__(self):
+        # 中文标点符号
+        self.chinese_punctuation = set('，。！？、；：""''（）【】《》…—')
+        # 英文标点符号
+        self.english_punctuation = set('.,!?;:\'"()[]{}')
+        # 停用词（简化版）
+        self.stopwords = set(['的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'])
+    
+    def clean_text(self, text: str) -> str:
+        """清洗文本"""
+        # 去除 HTML 标签
+        text = re.sub(r'<[^>]+>', '', text)
+        # 去除 URL
+        text = re.sub(r'http\S+|www.\S+', '', text)
+        # 去除多余空白
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+    
+    def tokenize_chinese(self, text: str) -> List[str]:
+        """
+        中文分词（简化版）
         
-    Returns:
-        词频统计
-    """
-    all_words = []
-    for text in texts:
-        # 简单分词
-        words = text.lower().split()
-        all_words.extend(words)
+        实际应用中应该使用 jieba 等专业分词工具
+        """
+        # 简单按字分（实际应用应该用 jieba）
+        tokens = []
+        current_word = []
+        
+        for char in text:
+            if '一' <= char <= '鿿':  # 中文字符
+                if current_word:
+                    tokens.append(''.join(current_word))
+                    current_word = []
+                tokens.append(char)
+            elif char.isalnum():  # 英文或数字
+                current_word.append(char)
+            else:
+                if current_word:
+                    tokens.append(''.join(current_word))
+                    current_word = []
+        
+        if current_word:
+            tokens.append(''.join(current_word))
+        
+        return tokens
     
-    # 统计词频
-    word_freq = Counter(all_words)
+    def tokenize_english(self, text: str) -> List[str]:
+        """英文分词"""
+        # 转小写
+        text = text.lower()
+        # 分词
+        tokens = text.split()
+        # 去除标点
+        tokens = [token.strip(self.english_punctuation) for token in tokens]
+        # 去除空字符串
+        tokens = [token for token in tokens if token]
+        return tokens
     
-    return dict(word_freq.most_common(10))
+    def remove_stopwords(self, tokens: List[str]) -> List[str]:
+        """去除停用词"""
+        return [token for token in tokens if token not in self.stopwords]
+    
+    def preprocess(self, text: str, language: str = "chinese") -> Dict:
+        """
+        完整的预处理流程
+        
+        Args:
+            text: 原始文本
+            language: 语言（chinese/english）
+        
+        Returns:
+            预处理结果
+        """
+        # 清洗文本
+        cleaned_text = self.clean_text(text)
+        
+        # 分词
+        if language == "chinese":
+            tokens = self.tokenize_chinese(cleaned_text)
+        else:
+            tokens = self.tokenize_english(cleaned_text)
+        
+        # 去除停用词
+        filtered_tokens = self.remove_stopwords(tokens)
+        
+        return {
+            "original": text,
+            "cleaned": cleaned_text,
+            "tokens": tokens,
+            "filtered_tokens": filtered_tokens,
+            "token_count": len(tokens),
+            "unique_tokens": list(set(tokens))
+        }
+
 
 # 使用示例
 if __name__ == "__main__":
-    # 文本预处理示例
-    sample_text = "自然语言处理是人工智能的重要方向！"
-    result = basic_text_preprocessing(sample_text)
-    print("文本预处理结果:")
-    for key, value in result.items():
-        print(f"  {key}: {value}")
+    preprocessor = TextPreprocessor()
     
-    # 词频分析示例
-    texts = [
-        "人工智能改变世界",
-        "机器学习是人工智能的分支",
-        "深度学习推动人工智能发展"
-    ]
-    freq = word_frequency_analysis(texts)
-    print("\n词频统计:")
-    for word, count in freq.items():
-        print(f"  {word}: {count}")
+    # 中文示例
+    chinese_text = "自然语言处理是人工智能的重要方向！"
+    result = preprocessor.preprocess(chinese_text, "chinese")
+    
+    print("=== 中文预处理 ===")
+    print(f"原始文本: {result['original']}")
+    print(f"清洗后: {result['cleaned']}")
+    print(f"分词结果: {result['tokens']}")
+    print(f"去停用词后: {result['filtered_tokens']}")
+    print(f"词数: {result['token_count']}")
+    
+    # 英文示例
+    english_text = "Natural Language Processing is an important direction of AI!"
+    result = preprocessor.preprocess(english_text, "english")
+    
+    print("\n=== 英文预处理 ===")
+    print(f"原始文本: {result['original']}")
+    print(f"分词结果: {result['tokens']}")
+    print(f"去停用词后: {result['filtered_tokens']}")
 ```
 
+---
+
+## 第三部分：文本表示方法
+
+### 文件：app/nlp/representations.py
+
 ```python
-# 文本表示方法演进
+"""
+文本表示方法
+"""
 
 import numpy as np
 from typing import List, Dict
 from collections import defaultdict
 
-# 1. One-Hot 编码
+
 class OneHotEncoder:
-    """One-Hot 编码器"""
+    """
+    One-Hot 编码器
+    
+    原理：每个词用一个稀疏向量表示，向量长度等于词表大小，
+    只有对应词的位置为 1，其他位置为 0
+    
+    优点：简单直观
+    缺点：维度灾难，无法表示词之间的关系
+    """
     
     def __init__(self):
         self.vocab = {}
@@ -135,6 +226,9 @@ class OneHotEncoder:
         
         self.vocab = {word: idx for idx, word in enumerate(sorted(words))}
         self.vocab_size = len(self.vocab)
+        
+        print(f"词表大小: {self.vocab_size}")
+        print(f"词表: {list(self.vocab.keys())[:10]}...")
     
     def encode(self, text: str) -> np.ndarray:
         """编码文本"""
@@ -146,10 +240,31 @@ class OneHotEncoder:
                 encoding[i, self.vocab[token]] = 1
         
         return encoding
+    
+    def decode(self, encoding: np.ndarray) -> List[str]:
+        """解码向量"""
+        tokens = []
+        for i in range(encoding.shape[0]):
+            idx = np.argmax(encoding[i])
+            for word, word_idx in self.vocab.items():
+                if word_idx == idx:
+                    tokens.append(word)
+                    break
+        return tokens
 
-# 2. TF-IDF 实现
+
 class TFIDFVectorizer:
-    """TF-IDF 向量化器"""
+    """
+    TF-IDF 向量化器
+    
+    TF (Term Frequency): 词频，一个词在文档中出现的频率
+    IDF (Inverse Document Frequency): 逆文档频率，一个词在所有文档中的稀有程度
+    
+    TF-IDF = TF × IDF
+    
+    优点：考虑了词的重要性
+    缺点：无法捕获语义信息
+    """
     
     def __init__(self):
         self.vocab = {}
@@ -203,9 +318,16 @@ class TFIDFVectorizer:
         
         return tfidf_matrix
 
-# 3. 词向量（简化版 Word2Vec）
+
 class SimpleWord2Vec:
-    """简化版 Word2Vec"""
+    """
+    简化版 Word2Vec
+    
+    原理：将词映射为稠密向量，语义相似的词在向量空间中距离相近
+    
+    优点：捕获语义信息，维度较低
+    缺点：需要大量训练数据
+    """
     
     def __init__(self, vector_size: int = 100, window_size: int = 2):
         self.vector_size = vector_size
@@ -225,6 +347,8 @@ class SimpleWord2Vec:
             self.word_vectors[word] = np.random.randn(self.vector_size)
             # 归一化
             self.word_vectors[word] /= np.linalg.norm(self.word_vectors[word])
+        
+        print(f"词向量训练完成，词表大小: {len(vocab)}")
     
     def get_vector(self, word: str) -> np.ndarray:
         """获取词向量"""
@@ -244,13 +368,35 @@ class SimpleWord2Vec:
             return 0.0
         
         return dot_product / (norm1 * norm2)
+    
+    def most_similar(self, word: str, top_k: int = 5) -> List[tuple]:
+        """查找最相似的词"""
+        if word not in self.word_vectors:
+            return []
+        
+        similarities = []
+        for other_word, vector in self.word_vectors.items():
+            if other_word != word:
+                sim = self.similarity(word, other_word)
+                similarities.append((other_word, sim))
+        
+        # 按相似度排序
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        
+        return similarities[:top_k]
+
 
 # 使用示例
 if __name__ == "__main__":
-    # One-Hot 编码示例
-    print("=== One-Hot 编码 ===")
-    texts = ["我 爱 学习", "学习 很 快乐", "我 爱 编程"]
+    # 测试数据
+    texts = [
+        "我 爱 学习",
+        "学习 很 快乐",
+        "我 爱 编程",
+        "编程 是 艺术"
+    ]
     
+    print("=== One-Hot 编码 ===")
     onehot = OneHotEncoder()
     onehot.fit(texts)
     
@@ -261,7 +407,6 @@ if __name__ == "__main__":
         print(f"非零元素: {np.count_nonzero(encoding)}")
         print()
     
-    # TF-IDF 示例
     print("=== TF-IDF ===")
     tfidf = TFIDFVectorizer()
     tfidf.fit(texts)
@@ -269,9 +414,9 @@ if __name__ == "__main__":
     tfidf_matrix = tfidf.transform(texts)
     print(f"TF-IDF 矩阵形状: {tfidf_matrix.shape}")
     print(f"词汇表大小: {len(tfidf.vocab)}")
+    print(f"词汇表: {list(tfidf.vocab.keys())}")
     
-    # 词向量示例
-    print("\n=== 词向量（简化版） ===")
+    print("\n=== Word2Vec（简化版）===")
     w2v = SimpleWord2Vec(vector_size=50)
     w2v.train(texts)
     
@@ -282,16 +427,56 @@ if __name__ == "__main__":
     if "学习" in w2v.word_vectors and "编程" in w2v.word_vectors:
         sim = w2v.similarity("学习", "编程")
         print(f"'学习' 和 '编程' 的相似度: {sim:.4f}")
+    
+    # 查找相似词
+    if "学习" in w2v.word_vectors:
+        similar = w2v.most_similar("学习", top_k=3)
+        print(f"与 '学习' 最相似的词: {similar}")
 ```
 
+---
+
+## 第四部分：Embedding 原理
+
+### 什么是 Embedding？
+
+**类比理解：**
+Embedding 就像给每个词一个"GPS 坐标"：
+- 每个词在向量空间中有一个位置
+- 语义相似的词，位置相近
+- 可以通过坐标计算距离（相似度）
+
+### Embedding 演进
+
+```
+文本表示方法演进：
+    
+One-Hot (1950s)
+    ↓ 稀疏，无法表示语义
+TF-IDF (1970s)
+    ↓ 考虑词的重要性
+Word2Vec (2013)
+    ↓ 捕获语义信息
+GloVe (2014)
+    ↓ 全局统计信息
+BERT Embedding (2018)
+    ↓ 上下文相关
+Transformer Embedding (2017-)
+    ↓ 现代 NLP 的基础
+LLM Embedding (2020-)
+    → 强大的语言理解
+```
+
+### 文件：app/nlp/embeddings.py
+
 ```python
-# 使用预训练模型生成 Embedding
+"""
+Embedding 生成器
+"""
 
-from typing import List, Optional
 import numpy as np
+from typing import List, Optional
 
-# 注意：需要安装 sentence-transformers
-# pip install sentence-transformers
 
 class EmbeddingGenerator:
     """Embedding 生成器"""
@@ -309,11 +494,11 @@ class EmbeddingGenerator:
         try:
             from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(model_name)
-            print(f"✅ 成功加载模型: {model_name}")
+            print(f"成功加载模型: {model_name}")
         except ImportError:
-            print("⚠️ sentence-transformers 未安装，使用模拟模式")
+            print("sentence-transformers 未安装，使用模拟模式")
         except Exception as e:
-            print(f"⚠️ 模型加载失败: {e}，使用模拟模式")
+            print(f"模型加载失败: {e}，使用模拟模式")
     
     def generate_embeddings(self, texts: List[str]) -> np.ndarray:
         """
@@ -321,7 +506,7 @@ class EmbeddingGenerator:
         
         Args:
             texts: 文本列表
-            
+        
         Returns:
             Embedding 矩阵
         """
@@ -333,16 +518,7 @@ class EmbeddingGenerator:
             return np.random.randn(len(texts), 384)
     
     def compute_similarity(self, text1: str, text2: str) -> float:
-        """
-        计算两个文本的相似度
-        
-        Args:
-            text1: 文本1
-            text2: 文本2
-            
-        Returns:
-            相似度分数
-        """
+        """计算两个文本的相似度"""
         embeddings = self.generate_embeddings([text1, text2])
         
         # 余弦相似度
@@ -358,17 +534,7 @@ class EmbeddingGenerator:
         texts: List[str],
         top_k: int = 3
     ) -> List[dict]:
-        """
-        查找相似文本
-        
-        Args:
-            query: 查询文本
-            texts: 候选文本列表
-            top_k: 返回前 k 个结果
-            
-        Returns:
-            相似文本列表
-        """
+        """查找相似文本"""
         all_texts = [query] + texts
         embeddings = self.generate_embeddings(all_texts)
         
@@ -388,9 +554,10 @@ class EmbeddingGenerator:
         
         return similarities[:top_k]
 
+
 # 使用示例
 if __name__ == "__main__":
-    print("=== Embedding 生成器 ===")
+    print("=== Embedding 生成器 ===\n")
     
     generator = EmbeddingGenerator()
     
@@ -427,37 +594,167 @@ if __name__ == "__main__":
         print(f"  - {result['text']} (相似度: {result['similarity']:.4f})")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 中文分词问题 | 使用 jieba 等专业分词工具 |
-| 2 | 内存不足 | 使用小规模模型或降采样 |
-| 3 | 模型下载失败 | 使用本地模型或模拟模式 |
-| 4 | 向量维度不匹配 | 检查模型输出维度，统一处理 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
+## 第五部分：可视化
+
+### 文件：app/nlp/visualization.py
+
+```python
+"""
+NLP 可视化工具
+"""
+
+import numpy as np
+from typing import List
+
+
+def visualize_onehot(texts: List[str], vocab: dict):
+    """可视化 One-Hot 编码"""
+    print("=== One-Hot 编码可视化 ===\n")
+    
+    # 打印词表
+    print("词表:")
+    for word, idx in vocab.items():
+        print(f"  {word}: {idx}")
+    print()
+    
+    # 打印编码
+    for text in texts:
+        tokens = text.split()
+        print(f"文本: {text}")
+        print("编码:")
+        for token in tokens:
+            if token in vocab:
+                encoding = [0] * len(vocab)
+                encoding[vocab[token]] = 1
+                print(f"  {token}: {encoding}")
+        print()
+
+
+def visualize_tfidf(tfidf_matrix: np.ndarray, vocab: dict, texts: List[str]):
+    """可视化 TF-IDF"""
+    print("=== TF-IDF 可视化 ===\n")
+    
+    vocab_list = sorted(vocab.keys())
+    
+    # 打印表头
+    print("文本".ljust(20), end="")
+    for word in vocab_list[:10]:
+        print(f"{word:>8}", end="")
+    print()
+    print("-" * 100)
+    
+    # 打印每行
+    for i, text in enumerate(texts):
+        print(text[:18].ljust(20), end="")
+        for j in range(min(10, len(vocab_list))):
+            value = tfidf_matrix[i, vocab[vocab_list[j]]]
+            print(f"{value:>8.3f}", end="")
+        print()
+
+
+def visualize_attention(words: List[str], attention_weights: np.ndarray):
+    """可视化注意力权重"""
+    print("=== 注意力权重可视化 ===\n")
+    
+    # 打印表头
+    print("     ", end="")
+    for word in words:
+        print(f"{word:>8}", end="")
+    print()
+    print("-" * (8 * len(words) + 6))
+    
+    # 打印每行
+    for i, word in enumerate(words):
+        print(f"{word:>4} |", end="")
+        for j in range(len(words)):
+            weight = attention_weights[i, j]
+            # 用星号表示权重大小
+            stars = int(weight * 20)
+            print(f"{'*' * stars:>8}", end="")
+        print()
+    
+    print("\n注: 星号越多表示注意力权重越大")
+
+
+def print_embedding_info(embeddings: np.ndarray, texts: List[str]):
+    """打印 Embedding 信息"""
+    print("=== Embedding 信息 ===\n")
+    
+    print(f"Embedding 数量: {len(embeddings)}")
+    print(f"Embedding 维度: {embeddings.shape[1]}")
+    print()
+    
+    for i, text in enumerate(texts):
+        print(f"文本 {i+1}: {text}")
+        print(f"  维度: {embeddings[i].shape}")
+        print(f"  均值: {embeddings[i].mean():.4f}")
+        print(f"  标准差: {embeddings[i].std():.4f}")
+        print()
+
+
+# 使用示例
+if __name__ == "__main__":
+    # One-Hot 可视化
+    texts = ["我 爱 学习", "学习 很 快乐"]
+    vocab = {"我": 0, "爱": 1, "学习": 2, "很": 3, "快乐": 4}
+    visualize_onehot(texts, vocab)
+    
+    # TF-IDF 可视化
+    tfidf_matrix = np.random.rand(2, 5)
+    visualize_tfidf(tfidf_matrix, vocab, texts)
+    
+    # 注意力可视化
+    words = ["我", "喜欢", "编程"]
+    attention = np.random.rand(3, 3)
+    attention = attention / attention.sum(axis=-1, keepdims=True)
+    visualize_attention(words, attention)
+```
+
+---
+
+## 验证清单
+
+完成今日学习后，检查以下项目：
+
+- [ ] 理解 NLP 的基本概念
+- [ ] 能解释文本预处理的步骤
+- [ ] 理解 One-Hot 编码的原理
+- [ ] 理解 TF-IDF 的原理
+- [ ] 理解 Word2Vec 的原理
+- [ ] 理解 Embedding 的作用
+- [ ] 能使用预训练模型生成 Embedding
+- [ ] 完成了可视化练习
+
+---
+
+## 今日小结
+
+| 概念 | 关键点 |
+|------|--------|
 | NLP | 自然语言处理，让计算机理解人类语言 |
-| Token | 文本的基本单位（词、字、子词） |
-| One-Hot | 用稀疏向量表示词汇的方法 |
-| TF-IDF | 词频-逆文档频率，衡量词的重要性 |
-| Word2Vec | 将词映射为稠密向量的方法 |
+| 分词 | 将文本切分成词语 |
+| One-Hot | 稀疏向量表示，无法表示语义 |
+| TF-IDF | 考虑词的重要性，基于统计 |
+| Word2Vec | 稠密向量，捕获语义信息 |
 | Embedding | 将离散对象映射为连续向量 |
 | 余弦相似度 | 衡量两个向量方向相似性的指标 |
 
-## ✅ 验收清单
-- [ ] 理解 NLP 的基本概念
-- [ ] 能解释不同文本表示方法的原理
-- [ ] 理解 Embedding 的作用
-- [ ] 能使用预训练模型生成 Embedding
+---
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+## 明日预告
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+明天我们将学习：
+- Transformer 架构
+- 自注意力机制
+- 位置编码
+- 多头注意力
+
+---
+
+## 参考资源
+
+- [NLP 入门教程](https://nlp.stanford.edu/)
+- [Word2Vec 原论文](https://arxiv.org/abs/1301.3781)
+- [Embedding 可视化](https://projector.tensorflow.org/)

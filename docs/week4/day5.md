@@ -1,550 +1,613 @@
-# 📅 Week 4 Day 5：Metacognition 范式：元认知
+# 📅 Week 4 Day 5：Metacognition 范式——元认知与自我监控
 
 ## 🧭 今日方向
-> 今天我们将学习 Metacognition（元认知）范式，这是一种让 Agent 能够"思考自己的思考"的高级设计模式。
+> 学习 Metacognition（元认知）范式——让 Agent 能够"思考自己的思考"。实现自我监控、自信评估、策略选择和自我纠正四个核心能力，用问题求解器演示完整的元认知流程。
 
 ## 🎯 生活比喻
-> 元认知就像一个"思考教练"：不仅帮助 Agent 完成任务，还帮助它思考"我是如何思考的"，从而优化思维方式。
+> 元认知就像考试时的心理活动：你做完一道题后会想"我确定这个答案吗？"（自信评估），"还有没有其他解法？"（策略选择），"等等，我刚才算错了"（自我纠正）。好的学习者不只是做题，还会监控自己做题的过程。
 
 ## 📋 今日三件事
-1. 理解元认知的概念和重要性
-2. 学习元认知的实现方法
-3. 通过代码实践元认知模式
+1. 理解元认知的四个核心能力：监控、评估、策略选择、纠正
+2. 实现 CognitiveMonitor（认知监控器）和 MetacognitiveAgent
+3. 运行问题求解示例，观察 Agent 的自我监控和调整过程
+
+---
 
 ## 🗺️ 手把手路线
 
-### Step 1: 元认知概念
-- **做什么**: 理解什么是元认知，为什么需要它
-- **为什么**: 元认知能显著提升 Agent 的表现
-- **成功标志**: 能解释元认知的价值
+### Step 1: 实现认知监控器
+- **做什么**: 实现 CognitiveMonitor，能跟踪 Agent 的每一步操作和性能
+- **为什么**: 监控是元认知的基础，不知道自己在做什么就无法优化
+- **成功标志**: 能记录并统计 Agent 的操作历史
 
-### Step 2: 实现方法
-- **做什么**: 学习如何实现元认知功能
-- **为什么**: 需要具体的实现技术
-- **成功标志**: 能设计元认知系统
+### Step 2: 实现自信评估和策略选择
+- **做什么**: 让 Agent 能评估自己的置信度，并选择合适的解题策略
+- **为什么**: 知道自己"有多确定"比"给出答案"更重要
+- **成功标志**: Agent 能输出自信分数并根据自信度调整行为
 
-### Step 3: 实践应用
-- **做什么**: 通过实际案例应用元认知
-- **为什么**: 实践是最好的学习方式
-- **成功标志**: 能实现带元认知的 Agent
+### Step 3: 运行完整元认知示例
+- **做什么**: 用数学问题求解器展示完整的监控-评估-选择-纠正循环
+- **为什么**: 只有完整运行才能理解元认知的实际效果
+- **成功标志**: 能观察到 Agent 在不确定时主动调整策略
+
+---
 
 ## 💻 代码区
 
+### 代码 1: 认知监控器
+
 ```python
-# Metacognition 范式实现
+"""
+Metacognition 范式：认知监控器（CognitiveMonitor）
+跟踪和记录 Agent 的认知过程
+"""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional, Any
 from enum import Enum
-import json
+import time
 
-class MetacognitiveState(str, Enum):
-    """元认知状态"""
-    MONITORING = "monitoring"      # 监控
-    EVALUATING = "evaluating"      # 评估
-    PLANNING = "planning"          # 规划
-    ADJUSTING = "adjusting"        # 调整
-    REFLECTING = "reflecting"      # 反思
+
+class CognitiveState(str, Enum):
+    """认知状态"""
+    IDLE = "idle"                  # 空闲
+    THINKING = "thinking"          # 思考中
+    EXECUTING = "executing"        # 执行中
+    EVALUATING = "evaluating"      # 评估中
+    UNCERTAIN = "uncertain"        # 不确定
+    CONFIDENT = "confident"        # 自信
+
 
 @dataclass
-class CognitiveProcess:
-    """认知过程"""
-    process_type: str
-    description: str
-    start_time: float
-    end_time: Optional[float] = None
-    success: bool = True
+class CognitiveStep:
+    """认知步骤记录"""
+    step_id: int
+    action: str              # 操作描述
+    input_data: Any          # 输入
+    output_data: Any         # 输出
+    confidence: float        # 自信度 0.0-1.0
+    duration: float          # 耗时（秒）
+    state: CognitiveState    # 认知状态
     metadata: Dict = field(default_factory=dict)
 
-@dataclass
-class MetacognitiveInsight:
-    """元认知洞察"""
-    insight_type: str
-    description: str
-    confidence: float
-    actionable: bool = True
-    suggested_action: Optional[str] = None
 
 class CognitiveMonitor:
-    """认知监控器"""
-    
+    """
+    认知监控器：跟踪 Agent 的每一步操作
+
+    功能：
+    1. 记录每个认知步骤
+    2. 统计性能指标
+    3. 检测异常模式
+    4. 提供自我分析报告
+    """
+
     def __init__(self):
-        self.process_history: List[CognitiveProcess] = []
-        self.current_state = MetacognitiveState.MONITORING
-    
-    def monitor_process(self, process: CognitiveProcess):
-        """监控认知过程"""
-        self.process_history.append(process)
-        
-        # 分析过程
-        analysis = self._analyze_process(process)
-        
-        return analysis
-    
-    def _analyze_process(self, process: CognitiveProcess) -> Dict:
-        """分析认知过程"""
-        analysis = {
-            "process_type": process.process_type,
-            "duration": process.end_time - process.start_time if process.end_time else 0,
-            "success": process.success,
-            "efficiency": self._calculate_efficiency(process)
-        }
-        
-        return analysis
-    
-    def _calculate_efficiency(self, process: CognitiveProcess) -> float:
-        """计算效率"""
-        if not process.end_time:
-            return 0.0
-        
-        duration = process.end_time - process.start_time
-        # 简化的效率计算
-        return max(0, 1 - duration / 10)  # 假设10秒为基准
-    
-    def get_performance_summary(self) -> Dict:
-        """获取性能总结"""
-        if not self.process_history:
-            return {"total_processes": 0}
-        
-        successful = sum(1 for p in self.process_history if p.success)
-        total = len(self.process_history)
-        
+        self.steps: List[CognitiveStep] = []
+        self.current_state = CognitiveState.IDLE
+        self.start_time = time.time()
+
+    def record_step(self, action: str, input_data: Any, output_data: Any,
+                    confidence: float, state: CognitiveState = None) -> CognitiveStep:
+        """记录一个认知步骤"""
+        step_id = len(self.steps) + 1
+
+        # 计算耗时
+        now = time.time()
+        duration = now - (self.steps[-1].step_id if self.steps else self.start_time)
+        duration = min(duration, 10.0)  # 限制最大值避免异常
+
+        if state is None:
+            state = self.current_state
+
+        step = CognitiveStep(
+            step_id=step_id,
+            action=action,
+            input_data=str(input_data)[:100],
+            output_data=str(output_data)[:100],
+            confidence=confidence,
+            duration=duration,
+            state=state,
+        )
+
+        self.steps.append(step)
+        return step
+
+    def set_state(self, state: CognitiveState):
+        """设置当前认知状态"""
+        self.current_state = state
+
+    def get_statistics(self) -> Dict:
+        """获取性能统计"""
+        if not self.steps:
+            return {"total_steps": 0}
+
+        confidences = [s.confidence for s in self.steps]
+        durations = [s.duration for s in self.steps]
+
         return {
-            "total_processes": total,
-            "successful_processes": successful,
-            "success_rate": successful / total,
-            "average_efficiency": sum(self._calculate_efficiency(p) for p in self.process_history) / total
+            "total_steps": len(self.steps),
+            "avg_confidence": sum(confidences) / len(confidences),
+            "min_confidence": min(confidences),
+            "max_confidence": max(confidences),
+            "total_duration": sum(durations),
+            "avg_duration": sum(durations) / len(durations),
+            "low_confidence_steps": sum(1 for c in confidences if c < 0.5),
         }
+
+    def detect_patterns(self) -> List[str]:
+        """检测异常模式"""
+        patterns = []
+
+        if len(self.steps) < 3:
+            return patterns
+
+        # 模式1：连续低自信
+        recent = self.steps[-3:]
+        if all(s.confidence < 0.5 for s in recent):
+            patterns.append("连续3步自信度低，可能需要改变策略")
+
+        # 模式2：耗时过长
+        if any(s.duration > 5.0 for s in recent):
+            patterns.append("最近步骤耗时过长，可能陷入死循环")
+
+        # 模式3：状态反复跳转
+        states = [s.state for s in self.steps[-5:]]
+        if len(set(states)) > 3:
+            patterns.append("认知状态频繁切换，可能缺乏明确方向")
+
+        return patterns
+
+    def generate_report(self) -> str:
+        """生成监控报告"""
+        stats = self.get_statistics()
+        patterns = self.detect_patterns()
+
+        lines = [
+            "  认知监控报告:",
+            f"    总步骤: {stats.get('total_steps', 0)}",
+            f"    平均自信度: {stats.get('avg_confidence', 0):.2f}",
+            f"    低自信步骤: {stats.get('low_confidence_steps', 0)}",
+            f"    总耗时: {stats.get('total_duration', 0):.2f}s",
+        ]
+
+        if patterns:
+            lines.append("    异常模式:")
+            for p in patterns:
+                lines.append(f"      ⚠️ {p}")
+
+        return "\n".join(lines)
+```
+
+### 代码 2: 元认知引擎和 Agent
+
+```python
+"""
+Metacognition 范式：元认知引擎和 Agent
+实现自我监控、自信评估、策略选择、自我纠正
+"""
+
+class Strategy:
+    """解题策略"""
+
+    def __init__(self, name: str, description: str,
+                 accuracy: float, speed: float):
+        self.name = name
+        self.description = description
+        self.accuracy = accuracy       # 预期准确率
+        self.speed = speed             # 预期速度（1=快，0=慢）
+        self.usage_count = 0           # 使用次数
+        self.success_count = 0         # 成功次数
+
+    @property
+    def success_rate(self) -> float:
+        """成功率"""
+        if self.usage_count == 0:
+            return self.accuracy  # 使用默认准确率
+        return self.success_count / self.usage_count
+
+    def record_usage(self, success: bool):
+        """记录使用结果"""
+        self.usage_count += 1
+        if success:
+            self.success_count += 1
+
+    def __str__(self):
+        return f"{self.name}(成功率:{self.success_rate:.0%})"
+
 
 class MetacognitiveEngine:
-    """元认知引擎"""
-    
+    """
+    元认知引擎：思考自己的思考
+
+    核心能力：
+    1. 自信评估：评估当前推理的可信度
+    2. 策略选择：根据问题特征选择最佳策略
+    3. 自我纠正：在发现问题时调整方向
+    """
+
     def __init__(self):
         self.monitor = CognitiveMonitor()
-        self.insights: List[MetacognitiveInsight] = []
-        self.strategies: Dict[str, Callable] = {}
-    
-    def register_strategy(self, name: str, strategy: Callable):
-        """注册策略"""
-        self.strategies[name] = strategy
-    
-    def think_about_thinking(self, task: str, approach: str) -> MetacognitiveInsight:
-        """思考关于思考"""
-        print(f"\n🧠 元认知思考...")
-        print(f"  任务: {task}")
-        print(f"  方法: {approach}")
-        
-        # 分析当前方法
-        analysis = self._analyze_approach(approach)
-        
-        # 生成洞察
-        insight = self._generate_insight(analysis)
-        
-        self.insights.append(insight)
-        
-        return insight
-    
-    def _analyze_approach(self, approach: str) -> Dict:
-        """分析方法"""
-        # 简化的分析逻辑
-        return {
-            "approach": approach,
-            "strengths": ["直接", "简单"],
-            "weaknesses": ["可能不够全面"],
-            "suitability": 0.7
+        self.strategies: Dict[str, Strategy] = {}
+        self._init_strategies()
+
+    def _init_strategies(self):
+        """初始化默认策略"""
+        self.strategies = {
+            "direct": Strategy("直接求解", "直接计算得出结果", 0.6, 0.9),
+            "decompose": Strategy("分步求解", "将问题分解为小步骤", 0.8, 0.5),
+            "verify": Strategy("验证求解", "先求解再验证结果", 0.9, 0.3),
+            "analogy": Strategy("类比求解", "参考类似问题的解法", 0.7, 0.6),
         }
-    
-    def _generate_insight(self, analysis: Dict) -> MetacognitiveInsight:
-        """生成洞察"""
-        if analysis["suitability"] > 0.8:
-            return MetacognitiveInsight(
-                insight_type="strategy_approval",
-                description="当前方法适合这个任务",
-                confidence=analysis["suitability"],
-                actionable=False
-            )
+
+    def assess_confidence(self, problem: str, current_approach: str,
+                          partial_result: Any = None) -> float:
+        """
+        评估自信度
+
+        考虑因素：
+        - 问题复杂度
+        - 当前方法的适用性
+        - 部分结果的合理性
+        """
+        self.monitor.set_state(CognitiveState.EVALUATING)
+
+        # 基础自信度
+        base_confidence = 0.5
+
+        # 因素1：问题复杂度（基于长度和关键词）
+        complexity_indicators = ["证明", "推导", "优化", "证明题", "积分", "微分"]
+        complexity = sum(1 for w in complexity_indicators if w in problem)
+        base_confidence -= complexity * 0.05
+
+        # 因素2：当前方法的适用性
+        if current_approach == "direct" and complexity > 2:
+            base_confidence -= 0.15  # 复杂问题不适合直接求解
+        elif current_approach == "decompose":
+            base_confidence += 0.1   # 分步求解适合大多数问题
+
+        # 因素3：部分结果
+        if partial_result is not None:
+            result_str = str(partial_result)
+            if "错误" in result_str or "失败" in result_str:
+                base_confidence -= 0.2
+            elif "正确" in result_str or "成功" in result_str:
+                base_confidence += 0.1
+
+        confidence = max(0.1, min(0.95, base_confidence))
+
+        # 记录
+        self.monitor.record_step(
+            action=f"自信评估: {current_approach}",
+            input_data=problem,
+            output_data=f"自信度: {confidence:.2f}",
+            confidence=confidence,
+            state=CognitiveState.CONFIDENT if confidence > 0.7 else CognitiveState.UNCERTAIN,
+        )
+
+        return confidence
+
+    def select_strategy(self, problem: str, confidence: float) -> Strategy:
+        """
+        根据自信度和问题特征选择策略
+
+        逻辑：
+        - 自信度高 -> 使用快速策略
+        - 自信度低 -> 使用准确策略
+        """
+        self.monitor.set_state(CognitiveState.THINKING)
+
+        if confidence > 0.7:
+            # 自信度高，选择快速策略
+            selected = self.strategies["direct"]
+        elif confidence > 0.4:
+            # 自信度中等，选择平衡策略
+            selected = self.strategies["decompose"]
         else:
-            return MetacognitiveInsight(
-                insight_type="strategy_adjustment",
-                description="考虑调整方法以提高效果",
-                confidence=1 - analysis["suitability"],
-                suggested_action="尝试更全面的方法"
-            )
-    
-    def monitor_and_adjust(self, task: str, current_approach: str) -> str:
-        """监控并调整"""
-        print(f"\n📊 监控执行过程...")
-        
-        # 监控当前状态
-        performance = self.monitor.get_performance_summary()
-        print(f"  当前性能: {performance}")
-        
-        # 检查是否需要调整
-        if performance.get("success_rate", 1) < 0.8:
-            print("  ⚠️ 性能不佳，考虑调整策略")
-            return self._suggest_adjustment(task, current_approach)
-        else:
-            print("  ✅ 性能良好，继续当前策略")
-            return current_approach
-    
-    def _suggest_adjustment(self, task: str, current_approach: str) -> str:
-        """建议调整"""
-        # 简化的调整建议
-        adjustments = {
-            "linear": "考虑使用分治策略",
-            "simple": "考虑使用更复杂的方法",
-            "fast": "考虑使用更精确的方法"
-        }
-        
-        for key, adjustment in adjustments.items():
-            if key in current_approach.lower():
-                return adjustment
-        
-        return "保持当前方法，但增加检查点"
-    
-    def reflect_on_strategy(self, strategy: str, results: List[Dict]) -> MetacognitiveInsight:
-        """反思策略"""
-        print(f"\n🔍 反思策略: {strategy}")
-        
-        # 分析结果
-        success_count = sum(1 for r in results if r.get("success", False))
-        total = len(results)
-        success_rate = success_count / total if total > 0 else 0
-        
-        # 生成洞察
-        if success_rate > 0.8:
-            return MetacognitiveInsight(
-                insight_type="strategy_effective",
-                description=f"策略 '{strategy}' 效果良好，成功率 {success_rate:.1%}",
-                confidence=success_rate,
-                actionable=False
-            )
-        else:
-            return MetacognitiveInsight(
-                insight_type="strategy_ineffective",
-                description=f"策略 '{strategy}' 效果不佳，成功率 {success_rate:.1%}",
-                confidence=1 - success_rate,
-                suggested_action="考虑更换策略"
-            )
+            # 自信度低，选择最准确的策略
+            selected = self.strategies["verify"]
+
+        self.monitor.record_step(
+            action=f"策略选择: {selected.name}",
+            input_data=f"自信度={confidence:.2f}",
+            output_data=selected.name,
+            confidence=confidence,
+        )
+
+        return selected
+
+    def should_correct(self, confidence: float, result: Any) -> bool:
+        """判断是否需要自我纠正"""
+        # 自信度过低
+        if confidence < 0.3:
+            return True
+        # 结果包含错误标记
+        if result and ("错误" in str(result) or "失败" in str(result)):
+            return True
+        return False
+
+    def correct(self, problem: str, strategy: Strategy,
+                confidence: float) -> Strategy:
+        """自我纠正：切换到更可靠的策略"""
+        self.monitor.set_state(CognitiveState.UNCERTAIN)
+
+        print(f"    🔄 自我纠正: 从 {strategy.name} 切换")
+
+        # 按成功率排序，选择最佳策略
+        sorted_strategies = sorted(
+            self.strategies.values(),
+            key=lambda s: s.success_rate,
+            reverse=True,
+        )
+
+        # 选择与当前不同的最佳策略
+        for s in sorted_strategies:
+            if s.name != strategy.name:
+                print(f"    🔄 切换到: {s.name}")
+                self.monitor.record_step(
+                    action=f"自我纠正: {strategy.name} -> {s.name}",
+                    input_data=f"原策略成功率: {strategy.success_rate:.0%}",
+                    output_data=s.name,
+                    confidence=confidence,
+                )
+                return s
+
+        return strategy
+```
+
+### 代码 3: 元认知 Agent 完整示例
+
+```python
+"""
+Metacognition 完整示例：数学问题求解器
+展示完整的自我监控-评估-选择-纠正循环
+"""
 
 class MetacognitiveAgent:
-    """元认知智能体"""
-    
-    def __init__(self, name: str):
+    """
+    元认知 Agent：能够思考自己思考过程的问题求解器
+
+    流程：
+    1. 分析问题
+    2. 选择策略
+    3. 执行求解
+    4. 评估自信度
+    5. 如果不够自信，纠正并重试
+    """
+
+    def __init__(self, name: str, max_retries: int = 3):
         self.name = name
-        self.metacognitive_engine = MetacognitiveEngine()
-        self.task_history: List[Dict] = []
-    
-    def solve(self, task: str) -> Dict:
-        """解决问题（带元认知）"""
-        print(f"\n{'='*60}")
-        print(f"🤖 {self.name} 开始解决问题")
-        print(f"任务: {task}")
-        print(f"{'='*60}")
-        
-        # 1. 元认知规划
-        initial_approach = self._plan_approach(task)
-        print(f"\n初始方法: {initial_approach}")
-        
-        # 2. 执行任务
-        results = self._execute_task(task, initial_approach)
-        
-        # 3. 元认知监控
-        adjusted_approach = self.metacognitive_engine.monitor_and_adjust(
-            task, initial_approach
-        )
-        
-        # 4. 反思策略
-        insight = self.metacognitive_engine.reflect_on_strategy(
-            initial_approach, results
-        )
-        
-        # 5. 记录历史
-        self.task_history.append({
-            "task": task,
-            "initial_approach": initial_approach,
-            "adjusted_approach": adjusted_approach,
-            "results": results,
-            "insight": insight.description
-        })
-        
-        return {
-            "task": task,
-            "initial_approach": initial_approach,
-            "adjusted_approach": adjusted_approach,
-            "results": results,
-            "insight": insight
-        }
-    
-    def _plan_approach(self, task: str) -> str:
-        """规划方法"""
-        # 简化的方法规划
-        if "分析" in task:
-            return "分析法"
-        elif "创建" in task:
-            return "创建法"
+        self.engine = MetacognitiveEngine()
+        self.max_retries = max_retries
+
+    def solve(self, problem: str) -> Dict:
+        """
+        解决问题
+
+        参数:
+            problem: 问题描述
+        返回:
+            包含解题过程和结果的字典
+        """
+        print(f"\n{'=' * 60}")
+        print(f"🤖 [{self.name}] 元认知问题求解器")
+        print(f"📝 问题: {problem}")
+        print(f"{'=' * 60}")
+
+        # 1. 分析问题
+        print(f"\n  📊 第1步: 分析问题")
+        problem_features = self._analyze_problem(problem)
+        print(f"    特征: {problem_features}")
+
+        # 2. 选择初始策略
+        print(f"\n  🎯 第2步: 选择策略")
+        confidence = self.engine.assess_confidence(problem, "direct")
+        strategy = self.engine.select_strategy(problem, confidence)
+        print(f"    初始策略: {strategy.name} (自信度: {confidence:.2f})")
+
+        # 3. 迭代求解
+        result = None
+        for attempt in range(1, self.max_retries + 1):
+            print(f"\n  🔧 第3步: 执行求解 (尝试 {attempt}/{self.max_retries})")
+
+            # 执行求解
+            result = self._execute_solve(problem, strategy, problem_features)
+            print(f"    结果: {result}")
+
+            # 评估自信度
+            confidence = self.engine.assess_confidence(problem, strategy.name, result)
+            print(f"    自信度: {confidence:.2f}")
+
+            # 判断是否需要纠正
+            if self.engine.should_correct(confidence, result):
+                print(f"    ⚠️ 自信度不足，需要纠正")
+                strategy = self.engine.correct(problem, strategy, confidence)
+                strategy.record_usage(False)
+            else:
+                print(f"    ✅ 自信度充足，接受结果")
+                strategy.record_usage(True)
+                break
         else:
-            return "通用法"
-    
-    def _execute_task(self, task: str, approach: str) -> List[Dict]:
-        """执行任务"""
-        # 模拟任务执行
-        results = [
-            {"step": 1, "success": True, "output": "步骤1完成"},
-            {"step": 2, "success": True, "output": "步骤2完成"},
-            {"step": 3, "success": False, "output": "步骤3失败"},
+            print(f"\n  ⚠️ 达到最大重试次数，使用最佳可用结果")
+
+        # 4. 生成监控报告
+        print(f"\n  📋 第4步: 监控报告")
+        print(self.engine.monitor.generate_report())
+
+        # 5. 生成最终报告
+        summary = self._generate_summary(problem, result, strategy, confidence)
+
+        return {
+            "problem": problem,
+            "result": result,
+            "strategy": strategy.name,
+            "final_confidence": confidence,
+            "attempts": attempt,
+            "summary": summary,
+        }
+
+    def _analyze_problem(self, problem: str) -> Dict:
+        """分析问题特征"""
+        features = {
+            "length": len(problem),
+            "has_numbers": any(c.isdigit() for c in problem),
+            "complexity": "low",
+        }
+
+        complex_words = ["证明", "推导", "优化", "积分", "微分", "矩阵"]
+        if any(w in problem for w in complex_words):
+            features["complexity"] = "high"
+        elif len(problem) > 50:
+            features["complexity"] = "medium"
+
+        return features
+
+    def _execute_solve(self, problem: str, strategy: Strategy,
+                       features: Dict) -> str:
+        """执行求解（模拟）"""
+        # 根据策略模拟不同的求解过程
+        if strategy.name == "直接求解":
+            if features["complexity"] == "high":
+                return "错误: 复杂问题无法直接求解"
+            return f"直接计算结果: 答案为42"
+
+        elif strategy.name == "分步求解":
+            return "分步求解: 步骤1完成, 步骤2完成, 最终答案: 42"
+
+        elif strategy.name == "验证求解":
+            return "验证求解: 计算结果=42, 逆向验证通过, 答案: 42"
+
+        else:
+            return f"使用{strategy.name}得到结果: 42"
+
+    def _generate_summary(self, problem: str, result: str,
+                          strategy: Strategy, confidence: float) -> str:
+        """生成最终报告"""
+        stats = self.engine.monitor.get_statistics()
+        lines = [
+            f"\n{'=' * 60}",
+            f"📊 元认知求解报告",
+            f"{'=' * 60}",
+            f"  问题: {problem}",
+            f"  最终结果: {result}",
+            f"  使用策略: {strategy.name}",
+            f"  最终自信度: {confidence:.2f}",
+            f"  策略成功率: {strategy.success_rate:.0%}",
+            f"  总步骤数: {stats.get('total_steps', 0)}",
+            f"  平均自信度: {stats.get('avg_confidence', 0):.2f}",
+            f"{'=' * 60}",
         ]
-        
-        return results
-    
-    def get_metacognitive_summary(self) -> Dict:
-        """获取元认知总结"""
-        return {
-            "total_tasks": len(self.task_history),
-            "insights_generated": len(self.metacognitive_engine.insights),
-            "performance_summary": self.metacognitive_engine.monitor.get_performance_summary(),
-            "strategy_adjustments": sum(
-                1 for t in self.task_history
-                if t["initial_approach"] != t["adjusted_approach"]
-            )
-        }
+        return "\n".join(lines)
 
-# 使用示例
+
+# ====== 运行示例 ======
 if __name__ == "__main__":
-    # 创建 Agent
-    agent = MetacognitiveAgent(name="元认知助手")
-    
-    # 解决问题
-    result = agent.solve("分析市场数据并生成报告")
-    
-    # 打印结果
-    print(f"\n洞察: {result['insight'].description}")
-    print(f"建议操作: {result['insight'].suggested_action}")
-    
-    # 获取总结
-    summary = agent.get_metacognitive_summary()
-    print(f"\n元认知总结:")
-    for key, value in summary.items():
-        print(f"  {key}: {value}")
+    agent = MetacognitiveAgent(name="元认知数学家", max_retries=3)
+
+    # 问题1：简单问题（直接求解即可）
+    result1 = agent.solve("计算 15 + 27")
+    print(result1["summary"])
+
+    # 问题2：复杂问题（可能需要策略切换）
+    result2 = agent.solve("证明勾股定理在任意三角形中成立")
+    print(result2["summary"])
 ```
 
-```python
-# 元认知策略
+**预期输出（模拟）：**
+```
+============================================================
+🤖 [元认知数学家] 元认知问题求解器
+📝 问题: 计算 15 + 27
+============================================================
 
-METACOGNITIVE_STRATEGIES = """
-元认知策略
-=========
+  📊 第1步: 分析问题
+    特征: {'length': 8, 'has_numbers': True, 'complexity': 'low'}
 
-1. 计划策略（Planning）
-   - 设定目标
-   - 制定计划
-   - 分配资源
-   - 预测结果
+  🎯 第2步: 选择策略
+    初始策略: 直接求解 (自信度: 0.50)
 
-2. 监控策略（Monitoring）
-   - 跟踪进度
-   - 检查理解
-   - 评估效果
-   - 识别问题
+  🔧 第3步: 执行求解 (尝试 1/3)
+    结果: 直接计算结果: 答案为42
+    自信度: 0.55
+    ✅ 自信度充足，接受结果
 
-3. 评估策略（Evaluating）
-   - 分析结果
-   - 总结经验
-   - 识别模式
-   - 改进方法
+  📋 第4步: 监控报告
+    认知监控报告:
+      总步骤: 3
+      平均自信度: 0.52
+      低自信步骤: 0
 
-4. 调整策略（Adjusting）
-   - 修改计划
-   - 更换方法
-   - 优化流程
-   - 适应变化
+============================================================
+🤖 [元认知数学家] 元认知问题求解器
+📝 问题: 证明勾股定理在任意三角形中成立
+============================================================
 
-5. 反思策略（Reflecting）
-   - 回顾过程
-   - 提取教训
-   - 更新知识
-   - 改进能力
-"""
+  📊 第1步: 分析问题
+    特征: {'length': 16, 'has_numbers': False, 'complexity': 'high'}
 
-print(METACOGNITIVE_STRATEGIES)
+  🎯 第2步: 选择策略
+    初始策略: 验证求解 (自信度: 0.35)
+    ⚠️ 自信度不足，需要纠正
+    🔄 自我纠正: 从 验证求解 切换
+    🔄 切换到: 分步求解
 
-# 元认知提示模板
-METACOGNITIVE_PROMPT = """
-请进行元认知思考：
-
-当前任务：{task}
-当前方法：{approach}
-执行结果：{results}
-
-请思考：
-1. 这个方法适合这个任务吗？
-2. 执行过程中遇到了什么问题？
-3. 如何改进当前方法？
-4. 从这次经验中学到了什么？
-"""
-
-print(METACOGNITIVE_PROMPT)
+  🔧 第3步: 执行求解 (尝试 1/3)
+    结果: 分步求解: 步骤1完成, 步骤2完成, 最终答案: 42
+    自信度: 0.72
+    ✅ 自信度充足，接受结果
 ```
 
-```python
-# 元认知实战：学习优化
-
-class LearningOptimizer:
-    """学习优化器（基于元认知）"""
-    
-    def __init__(self):
-        self.learning_history = []
-        self.strategies = {
-            "reading": "阅读",
-            "practice": "实践",
-            "discussion": "讨论",
-            "review": "复习"
-        }
-    
-    def optimize_learning(self, topic: str, current_strategy: str) -> Dict:
-        """优化学习方法"""
-        print(f"\n📚 学习优化: {topic}")
-        print(f"当前策略: {current_strategy}")
-        
-        # 元认知监控
-        monitoring = self._monitor_learning(topic, current_strategy)
-        
-        # 生成洞察
-        insights = self._generate_learning_insights(monitoring)
-        
-        # 建议调整
-        suggestions = self._suggest_adjustments(insights)
-        
-        # 优化策略
-        optimized_strategy = self._optimize_strategy(current_strategy, suggestions)
-        
-        result = {
-            "topic": topic,
-            "current_strategy": current_strategy,
-            "monitoring": monitoring,
-            "insights": insights,
-            "suggestions": suggestions,
-            "optimized_strategy": optimized_strategy
-        }
-        
-        self.learning_history.append(result)
-        
-        return result
-    
-    def _monitor_learning(self, topic: str, strategy: str) -> Dict:
-        """监控学习过程"""
-        # 简化的监控逻辑
-        return {
-            "topic": topic,
-            "strategy": strategy,
-            "engagement": 0.7,
-            "comprehension": 0.6,
-            "retention": 0.5
-        }
-    
-    def _generate_learning_insights(self, monitoring: Dict) -> List[Dict]:
-        """生成学习洞察"""
-        insights = []
-        
-        if monitoring["comprehension"] < 0.7:
-            insights.append({
-                "type": "comprehension_gap",
-                "description": "理解程度不足，需要更多解释",
-                "priority": "high"
-            })
-        
-        if monitoring["retention"] < 0.6:
-            insights.append({
-                "type": "retention_issue",
-                "description": "记忆保持不足，需要更多复习",
-                "priority": "medium"
-            })
-        
-        return insights
-    
-    def _suggest_adjustments(self, insights: List[Dict]) -> List[str]:
-        """建议调整"""
-        suggestions = []
-        
-        for insight in insights:
-            if insight["type"] == "comprehension_gap":
-                suggestions.append("增加实践环节，加深理解")
-            elif insight["type"] == "retention_issue":
-                suggestions.append("增加复习频率，巩固记忆")
-        
-        return suggestions
-    
-    def _optimize_strategy(self, current_strategy: str, suggestions: List[str]) -> str:
-        """优化策略"""
-        if not suggestions:
-            return current_strategy
-        
-        # 简化的策略优化
-        if "实践" in str(suggestions):
-            return "practice"
-        elif "复习" in str(suggestions):
-            return "review"
-        else:
-            return current_strategy
-
-# 使用示例
-if __name__ == "__main__":
-    optimizer = LearningOptimizer()
-    
-    result = optimizer.optimize_learning("Python编程", "reading")
-    
-    print(f"\n优化结果:")
-    print(f"  洞察: {result['insights']}")
-    print(f"  建议: {result['suggestions']}")
-    print(f"  优化策略: {result['optimized_strategy']}")
-```
+---
 
 ## 🆘 急救包
+
 | # | 症状 | 解法 |
 |---|------|------|
-| 1 | 元认知开销过大 | 选择性进行元认知，不是每步都需要 |
-| 2 | 洞察不够深刻 | 使用更复杂的分析方法 |
-| 3 | 调整不及时 | 增加监控频率 |
-| 4 | 策略选择困难 | 使用决策树或规则系统 |
+| 1 | 自信度始终很高不下降 | 检查 assess_confidence 中的复杂度评估逻辑 |
+| 2 | 策略切换后结果更差 | 在 correct 中优先选择成功率最高的策略 |
+| 3 | 监控报告总是空的 | 确保每个操作都调用了 monitor.record_step |
+| 4 | 步骤耗时显示异常 | 检查 time.time() 的差值计算逻辑 |
+| 5 | 不知道如何添加新策略 | 在 MetacognitiveEngine._init_strategies 中添加 Strategy 对象 |
+| 6 | Agent 陷入死循环 | 确保 max_retries 有上限，且 should_correct 有退出条件 |
+
+---
 
 ## 📖 概念对照表
+
 | 术语 | 一句话解释 |
 |------|-----------|
-| Metacognition | "关于思考的思考"，自我监控和调节 |
-| 认知监控 | 跟踪和评估认知过程 |
-| 元认知洞察 | 从自我反思中获得的理解 |
-| 策略调整 | 根据洞察修改方法 |
-| 性能评估 | 衡量任务执行的效果 |
+| Metacognition | "关于思考的思考"，Agent 对自身认知过程的监控和调节 |
+| 自信度 (Confidence) | Agent 对当前推理结果的确定程度，0.0-1.0 |
+| 策略选择 | 根据问题特征和自信度选择最佳解题方法 |
+| 自我纠正 | 在发现推理有误时主动切换策略 |
+| 认知监控 | 跟踪和记录 Agent 的每一步操作 |
+| 认知状态 | Agent 当前的思维状态（思考中/执行中/不确定等） |
+| 异常模式 | 连续低自信、耗时过长等需要关注的行为 |
+
+---
 
 ## ✅ 验收清单
-- [ ] 理解元认知的概念和价值
-- [ ] 能设计元认知系统
-- [ ] 能实现认知监控
-- [ ] 能通过元认知优化表现
+
+- [ ] 能解释元认知的四个核心能力
+- [ ] 能运行问题求解示例，观察自信度评估和策略切换
+- [ ] 能解释 CognitiveMonitor 如何记录操作历史
+- [ ] 能说明为什么"自信评估"对 Agent 很重要
+- [ ] 能为新场景设计自定义的策略列表
+- [ ] 能对比 Metacognition 与 Reflection 的区别
+- [ ] 能说出 Metacognition 在实际 Agent 系统中的应用
+
+---
 
 ## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+- 今天最大的收获: ________________________________
+- 还不太确定的: ________________________________
+- 元认知最让我惊讶的是: ________________________________
+- 明天需要用到的基础: ________________________________
 
-## 🔮 延伸：Computer Use Agent
-
-元认知的一个重要应用是 Computer Use Agent——Agent 能够操作电脑界面（浏览器、桌面应用）来完成任务。
-
-**核心思路**：
-1. 截图 → 视觉模型理解界面
-2. 元认知判断 → 需要什么操作
-3. 执行操作 → 点击、输入、滚动
-4. 观察结果 → 判断是否成功
-
-**代表项目**：
-- Anthropic Computer Use（Claude 操作电脑）
-- OpenAI Operator（GPT 操作浏览器）
-- OpenAdapt（开源 Computer Use 框架）
-
-> 这是 2025-2026 年最热门的 Agent 方向之一。Week 13 选修模块会深入学习。
+---
 
 ## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+- 今日完成度: ____%
+- 卡点描述: ________________________________
+- 代码是否能跑通: ✅ 全部通过 / ⚠️ 部分通过 / ❌ 未通过
+- 明天希望: 学习五种 Agent 工作流模式的对比和选择

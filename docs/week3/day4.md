@@ -1,255 +1,593 @@
-# 📅 Week 3 Day 4：提示工程：Few-shot / CoT / 结构化输出
+# Day 4: 提示工程 - Few-shot / CoT / 结构化输出
 
-## 🧭 今日方向
-> 今天我们将深入学习提示工程（Prompt Engineering），这是与大模型交互的核心技能。
+## 今日学习目标
 
-## 🎯 生活比喻
-> 提示工程就像和一个聪明但需要明确指示的助手沟通。好的提示就像好的问题，能引导出最好的答案。
+1. 掌握提示工程的基本原则
+2. 学习 Few-shot 提示方法
+3. 掌握 Chain-of-Thought 推理
+4. 设计结构化输出提示
+5. 构建提示管理系统
 
-## 📋 今日三件事
-1. 学习基础提示技巧
-2. 掌握 Few-shot 和 CoT 方法
-3. 实践结构化输出提示
+---
 
-## 🗺️ 手把手路线
+## 第一部分：提示工程基础
 
-### Step 1: 提示工程基础
-- **做什么**: 了解提示的基本结构和原则
-- **为什么**: 好的提示是获得好结果的基础
-- **成功标志**: 能设计有效的基础提示
+### 什么是提示工程？
 
-### Step 2: Few-shot 学习
-- **做什么**: 学习通过示例引导模型
-- **为什么**: 示例能让模型更好理解任务
-- **成功标志**: 能使用 Few-shot 提高输出质量
+**类比理解：**
+提示工程就像和聪明但需要明确指示的助手沟通：
+- 好的提示 = 好的问题，能引导出最好的答案
+- 差的提示 = 模糊的指令，得到模糊的回答
 
-### Step 3: Chain-of-Thought
-- **做什么**: 学习思维链提示方法
-- **为什么**: CoT 能提高复杂推理任务的表现
-- **成功标志**: 能使用 CoT 解决复杂问题
+### 提示的基本结构
 
-## 💻 代码区
+```
+系统提示 (System Prompt)
+    ↓ 定义 AI 的角色和行为
+用户提示 (User Prompt)
+    ↓ 具体的任务和要求
+示例 (Examples)
+    ↓ 展示期望的输入输出格式
+输出要求 (Output Requirements)
+    → 指定期望的格式和约束
+```
+
+---
+
+## 第二部分：Few-shot 学习
+
+### 什么是 Few-shot？
+
+**类比理解：**
+Few-shot 就像给孩子看例题：
+- 给几个例子（3-5个）
+- 孩子从例子中学习模式
+- 然后应用到新的问题
+
+### 文件：app/prompt/few_shot.py
 
 ```python
-# 提示工程基础
+"""
+Few-shot 提示模板
+"""
 
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from enum import Enum
 
-class PromptStyle(str, Enum):
-    """提示风格"""
-    BASIC = "basic"
-    FEW_SHOT = "few_shot"
-    CHAIN_OF_THOUGHT = "chain_of_thought"
-    STRUCTURED = "structured"
 
 @dataclass
-class PromptTemplate:
-    """提示模板"""
-    name: str
-    style: PromptStyle
-    template: str
-    description: str
-    examples: Optional[List[Dict]] = None
+class FewShotExample:
+    """Few-shot 示例"""
+    input_text: str
+    output_text: str
 
-# 1. 基础提示模板
-BASIC_TEMPLATES = {
-    "classification": PromptTemplate(
-        name="文本分类",
-        style=PromptStyle.BASIC,
-        template="请将以下文本分类为[正面/负面/中性]：\n\n文本：{text}\n\n分类：",
-        description="简单的文本分类提示"
-    ),
-    "summarization": PromptTemplate(
-        name="文本摘要",
-        style=PromptStyle.BASIC,
-        template="请用一句话总结以下文本：\n\n{text}\n\n摘要：",
-        description="简单的文本摘要提示"
-    ),
-    "extraction": PromptTemplate(
-        name="信息抽取",
-        style=PromptStyle.BASIC,
-        template="请从以下文本中提取人名：\n\n{text}\n\n人名列表：",
-        description="简单的信息抽取提示"
-    )
-}
 
-# 2. Few-shot 提示模板
-FEW_SHOT_TEMPLATES = {
-    "sentiment": PromptTemplate(
-        name="情感分析（Few-shot）",
-        style=PromptStyle.FEW_SHOT,
-        template="""请分析以下文本的情感。
-
-示例1：
-文本：这个产品非常好用，我很满意！
-情感：正面
-
-示例2：
-文本：服务太差了，再也不来了。
-情感：负面
-
-示例3：
-文本：今天天气一般。
-情感：中性
-
-现在请分析：
-文本：{text}
-情感：""",
-        description="使用示例引导的情感分析",
-        examples=[
-            {"text": "这个产品非常好用", "sentiment": "正面"},
-            {"text": "服务太差了", "sentiment": "负面"},
-            {"text": "今天天气一般", "sentiment": "中性"}
-        ]
-    ),
-    "translation": PromptTemplate(
-        name="翻译（Few-shot）",
-        style=PromptStyle.FEW_SHOT,
-        template="""请将中文翻译成英文。
-
-示例1：
-中文：今天天气很好。
-英文：The weather is nice today.
-
-示例2：
-中文：我喜欢编程。
-英文：I like programming.
-
-现在请翻译：
-中文：{text}
-英文：""",
-        description="使用示例引导的翻译"
-    )
-}
-
-# 3. Chain-of-Thought 提示模板
-COT_TEMPLATES = {
-    "math_reasoning": PromptTemplate(
-        name="数学推理（CoT）",
-        style=PromptStyle.CHAIN_OF_THOUGHT,
-        template="""请一步一步地解决这个数学问题。
-
-问题：{question}
-
-让我们一步一步思考：
-1. 首先，我需要理解问题...
-2. 然后，我需要...
-3. 接下来，...
-4. 最后，答案是...
-
-请按照上述格式，展示你的推理过程，然后给出最终答案。""",
-        description="使用思维链进行数学推理"
-    ),
-    "logic_reasoning": PromptTemplate(
-        name="逻辑推理（CoT）",
-        style=PromptStyle.CHAIN_OF_THOUGHT,
-        template="""请分析以下逻辑问题，展示你的推理过程。
-
-问题：{question}
-
-推理过程：
-1. 首先，分析已知条件...
-2. 然后，根据逻辑规则...
-3. 接下来，得出结论...
-4. 最终答案是...
-
-请展示完整的推理链条。""",
-        description="使用思维链进行逻辑推理"
-    )
-}
-
-# 4. 结构化输出提示模板
-STRUCTURED_TEMPLATES = {
-    "json_output": PromptTemplate(
-        name="JSON 输出",
-        style=PromptStyle.STRUCTURED,
-        template="""请分析以下文本，并以JSON格式输出结果。
-
-文本：{text}
-
-请严格按照以下JSON格式输出：
-{{
-    "sentiment": "正面/负面/中性",
-    "confidence": 0.0-1.0,
-    "keywords": ["关键词1", "关键词2"],
-    "summary": "一句话摘要"
-}}""",
-        description="要求模型输出JSON格式"
-    ),
-    "table_output": PromptTemplate(
-        name="表格输出",
-        style=PromptStyle.STRUCTURED,
-        template="""请分析以下文本，并以Markdown表格格式输出结果。
-
-文本：{text}
-
-请按以下格式输出表格：
-| 维度 | 内容 |
-|------|------|
-| 情感 | ... |
-| 关键词 | ... |
-| 摘要 | ... |""",
-        description="要求模型输出表格格式"
-    )
-}
-
-def get_prompt_template(
-    category: str,
-    template_name: str
-) -> Optional[PromptTemplate]:
-    """获取提示模板"""
-    all_templates = {
-        **BASIC_TEMPLATES,
-        **FEW_SHOT_TEMPLATES,
-        **COT_TEMPLATES,
-        **STRUCTURED_TEMPLATES
-    }
-    return all_templates.get(template_name)
-
-def list_templates_by_style(style: PromptStyle) -> List[str]:
-    """按风格列出模板"""
-    all_templates = {
-        **BASIC_TEMPLATES,
-        **FEW_SHOT_TEMPLATES,
-        **COT_TEMPLATES,
-        **STRUCTURED_TEMPLATES
-    }
+class FewShotPromptBuilder:
+    """Few-shot 提示构建器"""
     
-    return [
-        name for name, template in all_templates.items()
-        if template.style == style
-    ]
+    def __init__(self, task_description: str):
+        """
+        初始化
+        
+        Args:
+            task_description: 任务描述
+        """
+        self.task_description = task_description
+        self.examples: List[FewShotExample] = []
+    
+    def add_example(self, input_text: str, output_text: str) -> 'FewShotPromptBuilder':
+        """添加示例"""
+        self.examples.append(FewShotExample(input_text, output_text))
+        return self
+    
+    def build(self, input_text: str) -> str:
+        """构建提示"""
+        parts = [self.task_description, ""]
+        
+        # 添加示例
+        if self.examples:
+            parts.append("示例：")
+            parts.append("")
+            
+            for i, example in enumerate(self.examples, 1):
+                parts.append(f"输入 {i}: {example.input_text}")
+                parts.append(f"输出 {i}: {example.output_text}")
+                parts.append("")
+        
+        # 添加当前输入
+        parts.append("现在请处理：")
+        parts.append(f"输入: {input_text}")
+        parts.append("输出:")
+        
+        return "\n".join(parts)
+
+
+# ==================== 情感分析 Few-shot ====================
+
+class SentimentFewShot:
+    """情感分析 Few-shot 提示"""
+    
+    @staticmethod
+    def build_prompt(text: str) -> str:
+        """构建情感分析提示"""
+        builder = FewShotPromptBuilder(
+            "请分析以下文本的情感。"
+        )
+        
+        builder.add_example(
+            "这个产品非常好用，我很满意！",
+            "正面 (积极情感)"
+        )
+        builder.add_example(
+            "服务太差了，再也不来了。",
+            "负面 (消极情感)"
+        )
+        builder.add_example(
+            "今天天气一般。",
+            "中性 (无明显情感)"
+        )
+        
+        return builder.build(text)
+
+
+# ==================== 分类 Few-shot ====================
+
+class ClassificationFewShot:
+    """文本分类 Few-shot 提示"""
+    
+    @staticmethod
+    def build_prompt(text: str) -> str:
+        """构建分类提示"""
+        builder = FewShotPromptBuilder(
+            "请将文本分类为以下类别：技术、科学、商业、娱乐、体育"
+        )
+        
+        builder.add_example(
+            "Python 是一种流行的编程语言",
+            "技术"
+        )
+        builder.add_example(
+            "今天的股市大涨",
+            "商业"
+        )
+        builder.add_example(
+            "世界杯决赛今晚举行",
+            "体育"
+        )
+        builder.add_example(
+            "新上映的电影票房破纪录",
+            "娱乐"
+        )
+        
+        return builder.build(text)
+
+
+# ==================== 翻译 Few-shot ====================
+
+class TranslationFewShot:
+    """翻译 Few-shot 提示"""
+    
+    @staticmethod
+    def build_prompt(text: str, direction: str = "zh_to_en") -> str:
+        """构建翻译提示"""
+        if direction == "zh_to_en":
+            builder = FewShotPromptBuilder(
+                "请将中文翻译成英文。"
+            )
+            
+            builder.add_example(
+                "今天天气很好。",
+                "The weather is nice today."
+            )
+            builder.add_example(
+                "我喜欢编程。",
+                "I like programming."
+            )
+            builder.add_example(
+                "人工智能改变世界。",
+                "Artificial intelligence is changing the world."
+            )
+        else:
+            builder = FewShotPromptBuilder(
+                "Please translate English to Chinese."
+            )
+            
+            builder.add_example(
+                "The weather is nice today.",
+                "今天天气很好。"
+            )
+            builder.add_example(
+                "I like programming.",
+                "我喜欢编程。"
+            )
+        
+        return builder.build(text)
+
 
 # 使用示例
 if __name__ == "__main__":
-    print("=== 提示工程模板库 ===\n")
+    print("=== 情感分析 Few-shot ===\n")
+    prompt = SentimentFewShot.build_prompt("这个服务真的很棒！")
+    print(prompt)
     
-    # 列出所有模板
-    for style in PromptStyle:
-        templates = list_templates_by_style(style)
-        print(f"{style.value} 风格模板:")
-        for template_name in templates:
-            print(f"  - {template_name}")
-        print()
+    print("\n=== 分类 Few-shot ===\n")
+    prompt = ClassificationFewShot.build_prompt("机器学习是AI的重要分支")
+    print(prompt)
     
-    # 使用模板
-    sentiment_template = FEW_SHOT_TEMPLATES["sentiment"]
-    print("情感分析模板:")
-    print(sentiment_template.template)
-    
-    # 填充模板
-    text = "这个产品真的很好用，强烈推荐！"
-    filled_prompt = sentiment_template.template.format(text=text)
-    print(f"\n填充后的提示:\n{filled_prompt}")
+    print("\n=== 翻译 Few-shot ===\n")
+    prompt = TranslationFewShot.build_prompt("深度学习技术发展迅速")
+    print(prompt)
 ```
 
-```python
-# 提示工程最佳实践
+---
 
-class PromptEngineeringGuide:
-    """提示工程指南"""
+## 第三部分：Chain-of-Thought (CoT)
+
+### 什么是 CoT？
+
+**类比理解：**
+CoT 就像让孩子展示解题过程：
+- 不只要答案，还要步骤
+- 帮助理清思路
+- 减少错误
+
+### CoT 的优势
+
+```
+传统提示：
+Q: 小明有5个苹果，给了小红3个，又买了2个，现在有几个？
+A: 4个
+
+CoT 提示：
+Q: 小明有5个苹果，给了小红3个，又买了2个，现在有几个？
+A: 让我们一步一步思考：
+1. 小明开始有5个苹果
+2. 给了小红3个，剩下 5 - 3 = 2个
+3. 又买了2个，现在有 2 + 2 = 4个
+答案: 4个
+```
+
+### 文件：app/prompt/cot.py
+
+```python
+"""
+Chain-of-Thought 提示模板
+"""
+
+from typing import List, Optional
+from dataclasses import dataclass
+
+
+@dataclass
+class CoTExample:
+    """CoT 示例"""
+    question: str
+    reasoning: List[str]
+    answer: str
+
+
+class CoTPromptBuilder:
+    """CoT 提示构建器"""
+    
+    def __init__(self, task_description: str):
+        self.task_description = task_description
+        self.examples: List[CoTExample] = []
+    
+    def add_example(
+        self, 
+        question: str, 
+        reasoning: List[str], 
+        answer: str
+    ) -> 'CoTPromptBuilder':
+        """添加示例"""
+        self.examples.append(CoTExample(question, reasoning, answer))
+        return self
+    
+    def build(self, question: str) -> str:
+        """构建提示"""
+        parts = [self.task_description, ""]
+        
+        # 添加示例
+        if self.examples:
+            parts.append("示例：")
+            parts.append("")
+            
+            for i, example in enumerate(self.examples, 1):
+                parts.append(f"问题 {i}: {example.question}")
+                parts.append("推理过程:")
+                for step in example.reasoning:
+                    parts.append(f"  {step}")
+                parts.append(f"答案: {example.answer}")
+                parts.append("")
+        
+        # 添加当前问题
+        parts.append("现在请回答：")
+        parts.append(f"问题: {question}")
+        parts.append("让我们一步一步思考:")
+        
+        return "\n".join(parts)
+
+
+# ==================== 数学推理 CoT ====================
+
+class MathCoT:
+    """数学推理 CoT"""
+    
+    @staticmethod
+    def build_prompt(question: str) -> str:
+        """构建数学推理提示"""
+        builder = CoTPromptBuilder(
+            "请一步一步地解决这个数学问题。"
+        )
+        
+        builder.add_example(
+            "小明有5个苹果，给了小红3个，又买了2个，现在有几个？",
+            [
+                "1. 小明开始有5个苹果",
+                "2. 给了小红3个，剩下 5 - 3 = 2个",
+                "3. 又买了2个，现在有 2 + 2 = 4个"
+            ],
+            "4个"
+        )
+        
+        builder.add_example(
+            "一个长方形的长是8cm，宽是5cm，面积是多少？",
+            [
+                "1. 长方形面积公式: 面积 = 长 × 宽",
+                "2. 代入数值: 面积 = 8 × 5",
+                "3. 计算结果: 面积 = 40"
+            ],
+            "40平方厘米"
+        )
+        
+        return builder.build(question)
+
+
+# ==================== 逻辑推理 CoT ====================
+
+class LogicCoT:
+    """逻辑推理 CoT"""
+    
+    @staticmethod
+    def build_prompt(question: str) -> str:
+        """构建逻辑推理提示"""
+        builder = CoTPromptBuilder(
+            "请分析以下逻辑问题，展示你的推理过程。"
+        )
+        
+        builder.add_example(
+            "所有的猫都是动物，Tom是一只猫，Tom是什么？",
+            [
+                "1. 已知条件: 所有的猫都是动物",
+                "2. 已知条件: Tom是一只猫",
+                "3. 根据三段论推理: 如果所有A都是B，且C是A，那么C是B",
+                "4. 应用推理: 所有的猫(Tom)都是动物，所以Tom是动物"
+            ],
+            "Tom是动物"
+        )
+        
+        return builder.build(question)
+
+
+# ==================== 代码推理 CoT ====================
+
+class CodeCoT:
+    """代码推理 CoT"""
+    
+    @staticmethod
+    def build_prompt(question: str) -> str:
+        """构建代码推理提示"""
+        builder = CoTPromptBuilder(
+            "请分析以下编程问题，展示你的推理过程。"
+        )
+        
+        builder.add_example(
+            "如何判断一个数是否是偶数？",
+            [
+                "1. 偶数的定义: 能被2整除的数",
+                "2. 判断方法: 用这个数除以2，看余数是否为0",
+                "3. 代码实现: 使用取模运算符 %",
+                "4. 示例: 4 % 2 == 0, 所以4是偶数"
+            ],
+            "使用 n % 2 == 0 判断"
+        )
+        
+        return builder.build(question)
+
+
+# 使用示例
+if __name__ == "__main__":
+    print("=== 数学推理 CoT ===\n")
+    prompt = MathCoT.build_prompt("小华有10块钱，买了3本书，每本2块钱，还剩多少钱？")
+    print(prompt)
+    
+    print("\n=== 逻辑推理 CoT ===\n")
+    prompt = LogicCoT.build_prompt("如果今天是星期三，那么后天是星期几？")
+    print(prompt)
+    
+    print("\n=== 代码推理 CoT ===\n")
+    prompt = CodeCoT.build_prompt("如何反转一个字符串？")
+    print(prompt)
+```
+
+---
+
+## 第四部分：结构化输出提示
+
+### 文件：app/prompt/structured.py
+
+```python
+"""
+结构化输出提示模板
+"""
+
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
+import json
+
+
+@dataclass
+class StructuredOutputTemplate:
+    """结构化输出模板"""
+    name: str
+    description: str
+    output_schema: Dict[str, Any]
+    example_output: Dict[str, Any]
+    instructions: str
+
+
+class StructuredOutputPromptBuilder:
+    """结构化输出提示构建器"""
+    
+    def __init__(self):
+        self.templates: Dict[str, StructuredOutputTemplate] = {}
+    
+    def register_template(self, template: StructuredOutputTemplate):
+        """注册模板"""
+        self.templates[template.name] = template
+    
+    def build_prompt(
+        self, 
+        template_name: str, 
+        text: str,
+        additional_instructions: str = ""
+    ) -> str:
+        """构建提示"""
+        template = self.templates.get(template_name)
+        if not template:
+            raise ValueError(f"模板 '{template_name}' 不存在")
+        
+        prompt_parts = [
+            template.description,
+            "",
+            "任务:",
+            template.instructions,
+            "",
+            "输入文本:",
+            text,
+            "",
+            "请严格按照以下JSON格式输出:",
+            json.dumps(template.output_schema, indent=2, ensure_ascii=False),
+            "",
+            "示例输出:",
+            json.dumps(template.example_output, indent=2, ensure_ascii=False),
+        ]
+        
+        if additional_instructions:
+            prompt_parts.extend([
+                "",
+                "额外说明:",
+                additional_instructions
+            ])
+        
+        return "\n".join(prompt_parts)
+
+
+# 创建模板构建器
+builder = StructuredOutputPromptBuilder()
+
+# 注册情感分析模板
+builder.register_template(StructuredOutputTemplate(
+    name="sentiment_analysis",
+    description="分析文本的情感倾向",
+    output_schema={
+        "sentiment": "positive/negative/neutral",
+        "confidence": "0.0-1.0",
+        "keywords": ["关键词列表"],
+        "reason": "分析原因"
+    },
+    example_output={
+        "sentiment": "positive",
+        "confidence": 0.95,
+        "keywords": ["好用", "满意"],
+        "reason": "文本表达了积极的情绪"
+    },
+    instructions="分析文本的情感倾向，输出JSON格式"
+))
+
+# 注册实体抽取模板
+builder.register_template(StructuredOutputTemplate(
+    name="entity_extraction",
+    description="从文本中提取实体信息",
+    output_schema={
+        "entities": [
+            {
+                "text": "实体文本",
+                "type": "PERSON/ORG/LOC/DATE",
+                "start_pos": 0,
+                "end_pos": 10
+            }
+        ],
+        "entity_count": "实体数量"
+    },
+    example_output={
+        "entities": [
+            {"text": "张三", "type": "PERSON", "start_pos": 0, "end_pos": 2},
+            {"text": "北京", "type": "LOC", "start_pos": 5, "end_pos": 7}
+        ],
+        "entity_count": 2
+    },
+    instructions="从文本中提取人名、组织、地点、日期等实体"
+))
+
+# 注册摘要模板
+builder.register_template(StructuredOutputTemplate(
+    name="summarization",
+    description="生成文本摘要",
+    output_schema={
+        "summary": "一句话摘要",
+        "key_points": ["关键点列表"],
+        "word_count": "摘要字数"
+    },
+    example_output={
+        "summary": "本文讨论了人工智能的发展趋势",
+        "key_points": ["AI技术进步", "应用领域扩展", "伦理问题"],
+        "word_count": 15
+    },
+    instructions="生成简洁的文本摘要，包含关键点"
+))
+
+
+# 使用示例
+if __name__ == "__main__":
+    print("=== 情感分析提示 ===\n")
+    prompt = builder.build_prompt(
+        "sentiment_analysis",
+        "这个产品非常好用，我很满意！"
+    )
+    print(prompt)
+    
+    print("\n=== 实体抽取提示 ===\n")
+    prompt = builder.build_prompt(
+        "entity_extraction",
+        "张三在北京的公司工作，他觉得Python很好用。"
+    )
+    print(prompt)
+    
+    print("\n=== 摘要提示 ===\n")
+    prompt = builder.build_prompt(
+        "summarization",
+        "人工智能技术正在快速发展，已经应用到各个领域。从医疗到教育，从金融到制造，AI都在发挥着重要作用。然而，随着AI的普及，也带来了一些伦理问题，比如隐私保护、就业影响等。"
+    )
+    print(prompt)
+```
+
+---
+
+## 第五部分：提示工程最佳实践
+
+### 文件：app/prompt/best_practices.py
+
+```python
+"""
+提示工程最佳实践
+"""
+
+from typing import List, Dict
+
+
+class PromptBestPractices:
+    """提示工程最佳实践"""
     
     @staticmethod
     def basic_principles() -> str:
@@ -373,10 +711,10 @@ CoT 变体：
 JSON 输出提示示例：
 "请以JSON格式输出，包含以下字段：
 {
-    "field1": "值1",
-    "field2": ["值2", "值3"],
-    "field3": {
-        "nested1": "值4"
+    \"field1\": \"值1\",
+    \"field2\": [\"值2\", \"值3\"],
+    \"field3\": {
+        \"nested1\": \"值4\"
     }
 }"
 
@@ -386,42 +724,98 @@ JSON 输出提示示例：
 3. 处理可能的错误
 4. 验证输出格式
 """
+    
+    @staticmethod
+    def common_mistakes() -> str:
+        """常见错误"""
+        return """
+提示工程常见错误
+===============
+
+1. 提示太模糊
+   错误: "帮我分析一下"
+   正确: "请分析以下文本的情感，输出JSON格式"
+
+2. 缺少示例
+   错误: "分类文本"
+   正确: 提供3-5个分类示例
+
+3. 格式要求不明确
+   错误: "输出结果"
+   正确: "输出JSON格式，包含sentiment和confidence字段"
+
+4. 约束条件不清晰
+   错误: "写一段话"
+   正确: "用50-100字写一段关于AI的介绍"
+
+5. 忽略边界情况
+   错误: 只测试正常输入
+   正确: 测试空输入、超长输入、特殊字符等
+
+6. 不迭代优化
+   错误: 一次性写出完美提示
+   正确: 从简单开始，逐步优化
+"""
+
 
 # 使用示例
 if __name__ == "__main__":
-    guide = PromptEngineeringGuide()
+    practices = PromptBestPractices()
     
-    print(guide.basic_principles())
-    print(guide.few_shot_guide())
-    print(guide.chain_of_thought_guide())
-    print(guide.structured_output_guide())
+    print(practices.basic_principles())
+    print(practices.few_shot_guide())
+    print(practices.chain_of_thought_guide())
+    print(practices.structured_output_guide())
+    print(practices.common_mistakes())
 ```
 
-```python
-# 实战：构建提示管理系统
+---
 
-from typing import Dict, List, Any
-from dataclasses import dataclass
+## 第六部分：实战 - 构建提示管理系统
+
+### 文件：app/prompt/manager.py
+
+```python
+"""
+提示管理系统
+"""
+
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
 import json
+from datetime import datetime
+
 
 @dataclass
 class PromptConfig:
     """提示配置"""
     name: str
+    description: str
     template: str
     variables: List[str]
+    examples: List[Dict[str, str]] = field(default_factory=list)
     model: str = "gpt-3.5-turbo"
     temperature: float = 0.7
     max_tokens: int = 1000
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
+
 
 class PromptManager:
     """提示管理器"""
     
     def __init__(self):
         self.prompts: Dict[str, PromptConfig] = {}
+        self.version_history: Dict[str, List[PromptConfig]] = {}
     
     def register_prompt(self, config: PromptConfig):
         """注册提示配置"""
+        # 保存版本历史
+        if config.name in self.prompts:
+            if config.name not in self.version_history:
+                self.version_history[config.name] = []
+            self.version_history[config.name].append(self.prompts[config.name])
+        
         self.prompts[config.name] = config
     
     def get_prompt(self, name: str, **kwargs) -> str:
@@ -439,7 +833,7 @@ class PromptManager:
         # 填充模板
         return config.template.format(**kwargs)
     
-    def get_config(self, name: str) -> PromptConfig:
+    def get_config(self, name: str) -> Optional[PromptConfig]:
         """获取提示配置"""
         return self.prompts.get(name)
     
@@ -447,13 +841,49 @@ class PromptManager:
         """列出所有提示"""
         return list(self.prompts.keys())
     
+    def list_prompts_with_info(self) -> List[Dict[str, Any]]:
+        """列出所有提示（带详细信息）"""
+        result = []
+        for name, config in self.prompts.items():
+            result.append({
+                "name": name,
+                "description": config.description,
+                "variables": config.variables,
+                "model": config.model,
+                "temperature": config.temperature,
+                "created_at": config.created_at.isoformat()
+            })
+        return result
+    
+    def update_prompt(self, name: str, **kwargs):
+        """更新提示配置"""
+        if name not in self.prompts:
+            raise ValueError(f"提示 '{name}' 不存在")
+        
+        config = self.prompts[name]
+        
+        for key, value in kwargs.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        
+        config.updated_at = datetime.now()
+    
+    def delete_prompt(self, name: str):
+        """删除提示"""
+        if name not in self.prompts:
+            raise ValueError(f"提示 '{name}' 不存在")
+        
+        del self.prompts[name]
+    
     def export_prompts(self, filepath: str):
         """导出提示配置"""
         data = {}
         for name, config in self.prompts.items():
             data[name] = {
+                "description": config.description,
                 "template": config.template,
                 "variables": config.variables,
+                "examples": config.examples,
                 "model": config.model,
                 "temperature": config.temperature,
                 "max_tokens": config.max_tokens
@@ -461,14 +891,36 @@ class PromptManager:
         
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    def import_prompts(self, filepath: str):
+        """导入提示配置"""
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        for name, config_data in data.items():
+            config = PromptConfig(
+                name=name,
+                description=config_data.get("description", ""),
+                template=config_data["template"],
+                variables=config_data["variables"],
+                examples=config_data.get("examples", []),
+                model=config_data.get("model", "gpt-3.5-turbo"),
+                temperature=config_data.get("temperature", 0.7),
+                max_tokens=config_data.get("max_tokens", 1000)
+            )
+            self.register_prompt(config)
 
-# 创建提示管理器实例
-prompt_manager = PromptManager()
 
-# 注册一些提示
-prompt_manager.register_prompt(PromptConfig(
-    name="sentiment_analysis",
-    template="""请分析以下文本的情感。
+# 使用示例
+if __name__ == "__main__":
+    # 创建管理器
+    manager = PromptManager()
+    
+    # 注册提示
+    manager.register_prompt(PromptConfig(
+        name="sentiment_analysis",
+        description="情感分析提示",
+        template="""请分析以下文本的情感。
 
 文本：{text}
 
@@ -478,14 +930,15 @@ prompt_manager.register_prompt(PromptConfig(
     "confidence": 0.0-1.0,
     "reason": "分析原因"
 }}""",
-    variables=["text"],
-    model="gpt-3.5-turbo",
-    temperature=0.3
-))
-
-prompt_manager.register_prompt(PromptConfig(
-    name="code_review",
-    template="""请审查以下代码，并提供改进建议。
+        variables=["text"],
+        model="gpt-3.5-turbo",
+        temperature=0.3
+    ))
+    
+    manager.register_prompt(PromptConfig(
+        name="code_review",
+        description="代码审查提示",
+        template="""请审查以下代码，并提供改进建议。
 
 代码：
 ```{language}
@@ -499,65 +952,70 @@ prompt_manager.register_prompt(PromptConfig(
 4. 可维护性
 
 请提供详细的审查报告。""",
-    variables=["code", "language"],
-    model="gpt-4",
-    temperature=0.5
-))
-
-# 使用示例
-if __name__ == "__main__":
-    print("=== 提示管理系统 ===\n")
+        variables=["code", "language"],
+        model="gpt-4",
+        temperature=0.5
+    ))
     
-    # 列出所有提示
+    # 列出提示
+    print("=== 提示管理系统 ===\n")
     print("可用提示:")
-    for name in prompt_manager.list_prompts():
-        config = prompt_manager.get_config(name)
-        print(f"  - {name}: {config.variables}")
+    for info in manager.list_prompts_with_info():
+        print(f"  - {info['name']}: {info['description']}")
     
     # 使用提示
     print("\n使用情感分析提示:")
-    prompt = prompt_manager.get_prompt(
+    prompt = manager.get_prompt(
         "sentiment_analysis",
         text="这个产品真的很好用，强烈推荐！"
     )
     print(prompt)
     
-    # 导出提示配置
-    prompt_manager.export_prompts("prompts_config.json")
+    # 导出配置
+    manager.export_prompts("prompts_config.json")
     print("\n提示配置已导出到 prompts_config.json")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 输出不符合预期 | 优化提示，提供更多示例 |
-| 2 | CoT 不工作 | 尝试更明确的步骤指示 |
-| 3 | JSON 解析失败 | 提供更详细的格式说明 |
-| 4 | 模型忽略指令 | 使用更强的强调，如全大写 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| Prompt Engineering | 设计有效提示的技术 |
-| Few-shot | 通过示例引导模型学习 |
-| Chain-of-Thought | 让模型展示推理过程 |
-| Zero-shot | 不提供示例，直接提问 |
-| Temperature | 控制输出随机性的参数 |
-| Token | 模型处理文本的基本单位 |
-| Context Window | 模型能处理的最大文本长度 |
+## 验证清单
 
-## ✅ 验收清单
+完成今日学习后，检查以下项目：
+
 - [ ] 理解提示工程的基本原则
 - [ ] 能使用 Few-shot 提示
 - [ ] 能使用 CoT 进行推理
 - [ ] 能设计结构化输出提示
+- [ ] 构建了提示管理系统
+- [ ] 了解了常见错误和最佳实践
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+---
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+## 今日小结
+
+| 概念 | 关键点 |
+|------|--------|
+| 提示工程 | 设计有效提示的技术 |
+| Few-shot | 通过示例引导模型学习 |
+| Chain-of-Thought | 让模型展示推理过程 |
+| Zero-shot | 不提供示例，直接提问 |
+| 结构化输出 | 指定输出格式（JSON等） |
+| 提示管理 | 版本控制、模板化、可复用 |
+
+---
+
+## 明日预告
+
+明天我们将学习：
+- "When NOT to build agents" 判断框架
+- Agent 适用性分析
+- 替代方案选择
+- 案例分析
+
+---
+
+## 参考资源
+
+- [Prompt Engineering Guide](https://www.promptingguide.ai/)
+- [OpenAI Prompt Engineering](https://platform.openai.com/docs/guides/prompt-engineering)
+- [Anthropic Prompt Engineering](https://docs.anthropic.com/claude/docs/prompt-engineering)

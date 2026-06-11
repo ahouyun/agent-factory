@@ -1,312 +1,715 @@
-# 📅 Week 2 Day 7：测试 + 复盘
+# Day 7: 测试 + Week 2 复盘
 
-## 🧭 今日方向
-> 今天是 Week 2 的最后一天，我们将对 FastAPI 应用进行全面测试，然后进行本周的复盘总结。
+## 今日学习目标
 
-## 🎯 生活比喻
-> 如果说开发是建造房子，那么测试就是质量检查，复盘就是总结经验教训。只有经过严格检查的房子才能安心入住。
+1. 掌握 FastAPI 测试方法
+2. 编写完整的测试用例
+3. 执行测试并修复问题
+4. 完成 Week 2 的复盘总结
+5. 制定 Week 3 的学习计划
 
-## 📋 今日三件事
-1. 为 FastAPI 应用编写测试用例
-2. 执行测试并修复问题
-3. 完成 Week 2 的复盘总结
+---
 
-## 🗺️ 手把手路线
+## 第一部分：FastAPI 测试基础
 
-### Step 1: 测试策略
-- **做什么**: 制定测试计划，确定测试范围
-- **为什么**: 好的测试策略能提高测试效率
-- **成功标志**: 有清晰的测试计划
+### 为什么需要测试？
 
-### Step 2: 编写测试用例
-- **做什么**: 为 API 端点编写单元测试和集成测试
-- **为什么**: 测试是代码质量的保证
-- **成功标志**: 核心功能都有测试覆盖
+**类比理解：**
+测试就像质量检查：
+- 单元测试 = 检查每个零件
+- 集成测试 = 检查组装是否正确
+- 端到端测试 = 检查整体功能
 
-### Step 3: 复盘总结
-- **做什么**: 总结本周学习内容，记录经验和教训
-- **为什么**: 复盘是持续改进的关键
-- **成功标志**: 有完整的复盘报告
+### 测试金字塔
 
-## 💻 代码区
+```
+        /\
+       /  \        端到端测试（少）
+      /----\
+     /      \      集成测试（中）
+    /--------\
+   /          \    单元测试（多）
+  /------------\
+```
+
+### 安装测试依赖
+
+```bash
+# 安装测试相关依赖
+pip install pytest pytest-asyncio httpx
+
+# 验证安装
+pip list | grep -i "pytest\|httpx"
+```
+
+**预期输出：**
+```
+pytest                  7.4.3
+pytest-asyncio          0.23.2
+httpx                   0.25.2
+```
+
+---
+
+## 第二部分：测试配置
+
+### 文件：tests/conftest.py
 
 ```python
-# FastAPI 测试示例
+"""
+测试配置和 fixtures
+"""
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from typing import Generator
 
-# 测试数据库配置
+from app.database import Base, get_db
+from app.main import app
+
+# ==================== 测试数据库配置 ====================
+
+# 使用 SQLite 内存数据库
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 导入应用
-from main import app, get_db, Base
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
 
-# 测试客户端
-client = TestClient(app)
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
-# 测试前准备
-@pytest.fixture(scope="function")
-def setup_database():
-    """设置测试数据库"""
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+
+# ==================== Fixtures ====================
 
 @pytest.fixture(scope="function")
 def db_session():
-    """获取测试数据库会话"""
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-
-# 1. 基础端点测试
-def test_root_endpoint():
-    """测试根端点"""
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "message" in response.json()
-
-def test_health_check():
-    """测试健康检查端点"""
-    response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
-
-# 2. 用户 API 测试
-class TestUserAPI:
-    """用户 API 测试类"""
+    """创建测试数据库会话"""
+    # 创建表
+    Base.metadata.create_all(bind=engine)
     
-    def test_create_user(self, setup_database):
+    # 创建会话
+    session = TestingSessionLocal()
+    
+    yield session
+    
+    # 清理
+    session.close()
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def client(db_session):
+    """创建测试客户端"""
+    
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
+    with TestClient(app) as test_client:
+        yield test_client
+    
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def sample_user():
+    """示例用户数据"""
+    return {
+        "username": "testuser",
+        "email": "test@example.com",
+        "full_name": "Test User",
+        "password": "SecurePass123"
+    }
+
+
+@pytest.fixture
+def sample_task():
+    """示例任务数据"""
+    return {
+        "title": "测试任务",
+        "description": "这是一个测试任务",
+        "priority": "medium"
+    }
+```
+
+---
+
+## 第三部分：单元测试
+
+### 文件：tests/test_models.py
+
+```python
+"""
+模型测试
+"""
+
+import pytest
+from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from pydantic import ValidationError
+
+
+class TestUserSchemas:
+    """用户 Schema 测试"""
+    
+    def test_create_user_valid(self):
+        """测试创建有效用户"""
+        user = UserCreate(
+            username="testuser",
+            email="test@example.com",
+            password="SecurePass123"
+        )
+        assert user.username == "testuser"
+        assert user.email == "test@example.com"
+    
+    def test_create_user_short_username(self):
+        """测试用户名太短"""
+        with pytest.raises(ValidationError):
+            UserCreate(
+                username="ab",  # 太短
+                email="test@example.com",
+                password="SecurePass123"
+            )
+    
+    def test_create_user_weak_password(self):
+        """测试弱密码"""
+        with pytest.raises(ValidationError):
+            UserCreate(
+                username="testuser",
+                email="test@example.com",
+                password="weak"  # 太弱
+            )
+    
+    def test_update_user_partial(self):
+        """测试部分更新用户"""
+        update = UserUpdate(email="new@example.com")
+        assert update.email == "new@example.com"
+        assert update.full_name is None
+
+
+class TestTaskSchemas:
+    """任务 Schema 测试"""
+    
+    def test_create_task_valid(self):
+        """测试创建有效任务"""
+        task = TaskCreate(
+            title="测试任务",
+            priority="high"
+        )
+        assert task.title == "测试任务"
+        assert task.priority == "high"
+    
+    def test_create_task_empty_title(self):
+        """测试空标题"""
+        with pytest.raises(ValidationError):
+            TaskCreate(title="", priority="medium")
+```
+
+### 文件：tests/test_crud.py
+
+```python
+"""
+CRUD 操作测试
+"""
+
+import pytest
+from sqlalchemy.orm import Session
+
+from app.models.user import User
+from app.models.task import Task
+from app.crud.user import (
+    create_user, get_user, get_user_by_username,
+    update_user, delete_user
+)
+from app.crud.task import (
+    create_task, get_task, get_tasks, update_task, delete_task
+)
+from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.task import TaskCreate, TaskUpdate
+
+
+class TestUserCRUD:
+    """用户 CRUD 测试"""
+    
+    def test_create_user(self, db_session: Session):
         """测试创建用户"""
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
+        user_data = UserCreate(
+            username="testuser",
+            email="test@example.com",
+            password="SecurePass123"
+        )
         
-        response = client.post("/users/", json=user_data)
+        user = create_user(db_session, user_data, "hashed_password")
+        
+        assert user.id is not None
+        assert user.username == "testuser"
+        assert user.email == "test@example.com"
+    
+    def test_get_user(self, db_session: Session):
+        """测试获取用户"""
+        # 创建用户
+        user_data = UserCreate(
+            username="testuser",
+            email="test@example.com",
+            password="SecurePass123"
+        )
+        created_user = create_user(db_session, user_data, "hashed_password")
+        
+        # 获取用户
+        user = get_user(db_session, created_user.id)
+        
+        assert user is not None
+        assert user.username == "testuser"
+    
+    def test_get_user_by_username(self, db_session: Session):
+        """测试根据用户名获取用户"""
+        # 创建用户
+        user_data = UserCreate(
+            username="testuser",
+            email="test@example.com",
+            password="SecurePass123"
+        )
+        create_user(db_session, user_data, "hashed_password")
+        
+        # 根据用户名获取
+        user = get_user_by_username(db_session, "testuser")
+        
+        assert user is not None
+        assert user.username == "testuser"
+    
+    def test_update_user(self, db_session: Session):
+        """测试更新用户"""
+        # 创建用户
+        user_data = UserCreate(
+            username="testuser",
+            email="test@example.com",
+            password="SecurePass123"
+        )
+        user = create_user(db_session, user_data, "hashed_password")
+        
+        # 更新用户
+        update_data = UserUpdate(email="new@example.com")
+        updated_user = update_user(db_session, user, update_data)
+        
+        assert updated_user.email == "new@example.com"
+    
+    def test_delete_user(self, db_session: Session):
+        """测试删除用户"""
+        # 创建用户
+        user_data = UserCreate(
+            username="testuser",
+            email="test@example.com",
+            password="SecurePass123"
+        )
+        user = create_user(db_session, user_data, "hashed_password")
+        
+        # 删除用户
+        result = delete_user(db_session, user.id)
+        
+        assert result is True
+        assert get_user(db_session, user.id) is None
+
+
+class TestTaskCRUD:
+    """任务 CRUD 测试"""
+    
+    def test_create_task(self, db_session: Session):
+        """测试创建任务"""
+        task_data = TaskCreate(
+            title="测试任务",
+            priority="high"
+        )
+        
+        task = create_task(db_session, task_data, owner_id=1)
+        
+        assert task.id is not None
+        assert task.title == "测试任务"
+        assert task.priority == "high"
+    
+    def test_get_task(self, db_session: Session):
+        """测试获取任务"""
+        # 创建任务
+        task_data = TaskCreate(
+            title="测试任务",
+            priority="medium"
+        )
+        created_task = create_task(db_session, task_data, owner_id=1)
+        
+        # 获取任务
+        task = get_task(db_session, created_task.id)
+        
+        assert task is not None
+        assert task.title == "测试任务"
+    
+    def test_update_task(self, db_session: Session):
+        """测试更新任务"""
+        # 创建任务
+        task_data = TaskCreate(
+            title="测试任务",
+            priority="low"
+        )
+        task = create_task(db_session, task_data, owner_id=1)
+        
+        # 更新任务
+        from app.models.task import TaskStatus
+        update_data = TaskUpdate(
+            title="更新后的任务",
+            status=TaskStatus.COMPLETED
+        )
+        updated_task = update_task(db_session, task, update_data)
+        
+        assert updated_task.title == "更新后的任务"
+    
+    def test_delete_task(self, db_session: Session):
+        """测试删除任务"""
+        # 创建任务
+        task_data = TaskCreate(
+            title="测试任务",
+            priority="medium"
+        )
+        task = create_task(db_session, task_data, owner_id=1)
+        
+        # 删除任务
+        result = delete_task(db_session, task.id)
+        
+        assert result is True
+        assert get_task(db_session, task.id) is None
+```
+
+---
+
+## 第四部分：API 集成测试
+
+### 文件：tests/test_api.py
+
+```python
+"""
+API 集成测试
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+
+
+class TestHealthAPI:
+    """健康检查 API 测试"""
+    
+    def test_health_check(self, client: TestClient):
+        """测试健康检查端点"""
+        response = client.get("/health")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "healthy"
+    
+    def test_root(self, client: TestClient):
+        """测试根端点"""
+        response = client.get("/")
+        
+        assert response.status_code == 200
+        assert "message" in response.json()
+
+
+class TestUserAPI:
+    """用户 API 测试"""
+    
+    def test_create_user(self, client: TestClient, sample_user):
+        """测试创建用户"""
+        response = client.post(
+            "/api/v1/users",
+            json=sample_user
+        )
+        
         assert response.status_code == 201
-        
         data = response.json()
-        assert data["username"] == user_data["username"]
-        assert data["email"] == user_data["email"]
+        assert data["username"] == sample_user["username"]
+        assert data["email"] == sample_user["email"]
         assert "id" in data
     
-    def test_create_duplicate_user(self, setup_database):
+    def test_create_duplicate_user(self, client: TestClient, sample_user):
         """测试创建重复用户"""
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        
         # 第一次创建
-        client.post("/users/", json=user_data)
+        client.post("/api/v1/users", json=sample_user)
         
         # 第二次创建（应该失败）
-        response = client.post("/users/", json=user_data)
+        response = client.post("/api/v1/users", json=sample_user)
+        
         assert response.status_code == 400
     
-    def test_get_user(self, setup_database):
+    def test_get_user(self, client: TestClient, sample_user):
         """测试获取用户"""
         # 先创建用户
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        create_response = client.post("/users/", json=user_data)
+        create_response = client.post("/api/v1/users", json=sample_user)
         user_id = create_response.json()["id"]
         
         # 获取用户
-        response = client.get(f"/users/{user_id}")
+        response = client.get(f"/api/v1/users/{user_id}")
+        
         assert response.status_code == 200
-        assert response.json()["username"] == user_data["username"]
+        assert response.json()["username"] == sample_user["username"]
     
-    def test_get_nonexistent_user(self, setup_database):
+    def test_get_nonexistent_user(self, client: TestClient):
         """测试获取不存在的用户"""
-        response = client.get("/users/999")
+        response = client.get("/api/v1/users/999")
+        
         assert response.status_code == 404
     
-    def test_update_user(self, setup_database):
+    def test_list_users(self, client: TestClient, sample_user):
+        """测试获取用户列表"""
+        # 创建几个用户
+        for i in range(3):
+            user_data = sample_user.copy()
+            user_data["username"] = f"user{i}"
+            user_data["email"] = f"user{i}@example.com"
+            client.post("/api/v1/users", json=user_data)
+        
+        # 获取列表
+        response = client.get("/api/v1/users")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "users" in data
+        assert len(data["users"]) == 3
+    
+    def test_update_user(self, client: TestClient, sample_user):
         """测试更新用户"""
         # 先创建用户
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        create_response = client.post("/users/", json=user_data)
+        create_response = client.post("/api/v1/users", json=sample_user)
         user_id = create_response.json()["id"]
         
         # 更新用户
         update_data = {"email": "newemail@example.com"}
-        response = client.put(f"/users/{user_id}", json=update_data)
+        response = client.put(f"/api/v1/users/{user_id}", json=update_data)
+        
         assert response.status_code == 200
         assert response.json()["email"] == update_data["email"]
     
-    def test_delete_user(self, setup_database):
+    def test_delete_user(self, client: TestClient, sample_user):
         """测试删除用户"""
         # 先创建用户
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        create_response = client.post("/users/", json=user_data)
+        create_response = client.post("/api/v1/users", json=sample_user)
         user_id = create_response.json()["id"]
         
         # 删除用户
-        response = client.delete(f"/users/{user_id}")
-        assert response.status_code == 200
+        response = client.delete(f"/api/v1/users/{user_id}")
+        
+        assert response.status_code == 204
         
         # 验证用户已删除
-        get_response = client.get(f"/users/{user_id}")
+        get_response = client.get(f"/api/v1/users/{user_id}")
         assert get_response.status_code == 404
 
-# 3. 任务 API 测试
+
 class TestTaskAPI:
-    """任务 API 测试类"""
+    """任务 API 测试"""
     
-    def test_create_task(self, setup_database):
+    def test_create_task(self, client: TestClient, sample_user, sample_task):
         """测试创建任务"""
         # 先创建用户
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        user_response = client.post("/users/", json=user_data)
+        user_response = client.post("/api/v1/users", json=sample_user)
         user_id = user_response.json()["id"]
         
         # 创建任务
-        task_data = {
-            "title": "测试任务",
-            "description": "这是一个测试任务",
-            "priority": 3
-        }
-        response = client.post(f"/tasks/?owner_id={user_id}", json=task_data)
+        response = client.post(
+            f"/api/v1/users/{user_id}/tasks",
+            json=sample_task
+        )
+        
         assert response.status_code == 201
-        assert response.json()["title"] == task_data["title"]
+        data = response.json()
+        assert data["title"] == sample_task["title"]
     
-    def test_get_tasks(self, setup_database):
+    def test_list_tasks(self, client: TestClient, sample_user, sample_task):
         """测试获取任务列表"""
-        # 先创建用户和任务
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        user_response = client.post("/users/", json=user_data)
+        # 先创建用户
+        user_response = client.post("/api/v1/users", json=sample_user)
         user_id = user_response.json()["id"]
         
-        # 创建多个任务
+        # 创建几个任务
         for i in range(3):
-            task_data = {"title": f"任务{i+1}", "priority": i+1}
-            client.post(f"/tasks/?owner_id={user_id}", json=task_data)
+            task_data = sample_task.copy()
+            task_data["title"] = f"任务{i}"
+            client.post(f"/api/v1/users/{user_id}/tasks", json=task_data)
         
-        # 获取任务列表
-        response = client.get(f"/tasks/?owner_id={user_id}")
+        # 获取列表
+        response = client.get(f"/api/v1/users/{user_id}/tasks")
+        
         assert response.status_code == 200
-        assert len(response.json()) == 3
+        data = response.json()
+        assert len(data["tasks"]) == 3
     
-    def test_update_task_status(self, setup_database):
-        """测试更新任务状态"""
+    def test_update_task(self, client: TestClient, sample_user, sample_task):
+        """测试更新任务"""
         # 先创建用户和任务
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        user_response = client.post("/users/", json=user_data)
+        user_response = client.post("/api/v1/users", json=sample_user)
         user_id = user_response.json()["id"]
         
-        task_data = {"title": "测试任务", "priority": 2}
-        task_response = client.post(f"/tasks/?owner_id={user_id}", json=task_data)
+        task_response = client.post(
+            f"/api/v1/users/{user_id}/tasks",
+            json=sample_task
+        )
         task_id = task_response.json()["id"]
         
-        # 更新状态
-        response = client.patch(
-            f"/tasks/{task_id}/status",
-            json={"status": "completed"}
-        )
+        # 更新任务
+        update_data = {"title": "更新后的任务", "status": "completed"}
+        response = client.put(f"/api/v1/tasks/{task_id}", json=update_data)
+        
         assert response.status_code == 200
-        assert response.json()["status"] == "completed"
+        assert response.json()["title"] == update_data["title"]
+    
+    def test_delete_task(self, client: TestClient, sample_user, sample_task):
+        """测试删除任务"""
+        # 先创建用户和任务
+        user_response = client.post("/api/v1/users", json=sample_user)
+        user_id = user_response.json()["id"]
+        
+        task_response = client.post(
+            f"/api/v1/users/{user_id}/tasks",
+            json=sample_task
+        )
+        task_id = task_response.json()["id"]
+        
+        # 删除任务
+        response = client.delete(f"/api/v1/tasks/{task_id}")
+        
+        assert response.status_code == 204
+        
+        # 验证任务已删除
+        get_response = client.get(f"/api/v1/tasks/{task_id}")
+        assert get_response.status_code == 404
 
-# 4. 认证测试
-class TestAuthentication:
-    """认证测试类"""
+
+class TestAuthAPI:
+    """认证 API 测试"""
     
-    def test_register_user(self, setup_database):
+    def test_register(self, client: TestClient, sample_user):
         """测试用户注册"""
-        user_data = {
-            "username": "newuser",
-            "email": "new@example.com",
-            "password": "password123"
-        }
-        response = client.post("/auth/register", json=user_data)
+        response = client.post(
+            "/api/v1/auth/register",
+            json=sample_user
+        )
+        
         assert response.status_code == 201
+        assert response.json()["username"] == sample_user["username"]
     
-    def test_login_user(self, setup_database):
+    def test_login(self, client: TestClient, sample_user):
         """测试用户登录"""
         # 先注册
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        client.post("/auth/register", json=user_data)
+        client.post("/api/v1/auth/register", json=sample_user)
         
         # 登录
         response = client.post(
-            "/auth/login",
-            params={"username": "testuser", "password": "password123"}
+            "/api/v1/auth/login",
+            data={
+                "username": sample_user["username"],
+                "password": sample_user["password"]
+            }
         )
+        
         assert response.status_code == 200
         assert "access_token" in response.json()
+        assert "refresh_token" in response.json()
     
-    def test_protected_endpoint(self, setup_database):
+    def test_protected_endpoint(self, client: TestClient, sample_user):
         """测试受保护端点"""
-        # 先注册和登录
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        client.post("/auth/register", json=user_data)
+        # 先注册
+        client.post("/api/v1/auth/register", json=sample_user)
         
+        # 登录获取令牌
         login_response = client.post(
-            "/auth/login",
-            params={"username": "testuser", "password": "password123"}
+            "/api/v1/auth/login",
+            data={
+                "username": sample_user["username"],
+                "password": sample_user["password"]
+            }
         )
         token = login_response.json()["access_token"]
         
         # 访问受保护端点
         response = client.get(
-            "/auth/me",
+            "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {token}"}
         )
+        
         assert response.status_code == 200
-
-if __name__ == "__main__":
-    # 运行测试
-    pytest.main([__file__, "-v", "--tb=short"])
+        assert response.json()["username"] == sample_user["username"]
+    
+    def test_protected_endpoint_without_token(self, client: TestClient):
+        """测试无令牌访问受保护端点"""
+        response = client.get("/api/v1/auth/me")
+        
+        assert response.status_code == 403
 ```
 
+---
+
+## 第五部分：运行测试
+
+### 运行所有测试
+
+```bash
+# 运行所有测试
+pytest
+
+# 运行详细模式
+pytest -v
+
+# 运行特定文件
+pytest tests/test_models.py -v
+
+# 运行特定类
+pytest tests/test_api.py::TestUserAPI -v
+
+# 运行特定测试
+pytest tests/test_api.py::TestUserAPI::test_create_user -v
+
+# 生成覆盖率报告
+pytest --cov=app --cov-report=html
+```
+
+### 预期输出
+
+```
+============================= test session starts ==============================
+...
+tests/test_models.py::TestUserSchemas::test_create_user_valid PASSED        [ 11%]
+tests/test_models.py::TestUserSchemas::test_create_user_short_username PASSED [ 22%]
+tests/test_models.py::TestUserSchemas::test_create_user_weak_password PASSED [ 33%]
+tests/test_models.py::TestUserSchemas::test_update_user_partial PASSED      [ 44%]
+...
+tests/test_api.py::TestUserAPI::test_create_user PASSED                     [ 55%]
+tests/test_api.py::TestUserAPI::test_get_user PASSED                        [ 66%]
+tests/test_api.py::TestUserAPI::test_update_user PASSED                     [ 77%]
+tests/test_api.py::TestUserAPI::test_delete_user PASSED                     [ 88%]
+...
+============================== 15 passed in 2.34s ===============================
+```
+
+---
+
+## 第六部分：Week 2 复盘
+
+### 复盘报告模板
+
 ```python
-# Week 2 复盘脚本
+"""
+Week 2 复盘报告生成器
+"""
 
 from datetime import datetime
-from typing import Dict, List, Any
 from dataclasses import dataclass, field
+from typing import List, Dict
+
 
 @dataclass
 class DailyRecord:
@@ -318,8 +721,9 @@ class DailyRecord:
     challenges: List[str]
     rating: int  # 1-5
 
+
 class Week2Review:
-    """Week 2 复盘类"""
+    """Week 2 复盘"""
     
     def __init__(self):
         self.records: List[DailyRecord] = []
@@ -334,62 +738,54 @@ class Week2Review:
         ]
     
     def add_record(self, record: DailyRecord):
-        """添加每日记录"""
+        """添加记录"""
         self.records.append(record)
     
-    def calculate_stats(self) -> Dict[str, Any]:
-        """计算统计数据"""
-        total_days = len(self.records)
-        completed_days = sum(1 for r in self.records if r.completed)
-        avg_rating = sum(r.rating for r in self.records) / total_days if total_days > 0 else 0
-        
-        all_challenges = []
-        for record in self.records:
-            all_challenges.extend(record.challenges)
+    def calculate_stats(self) -> Dict:
+        """计算统计"""
+        total = len(self.records)
+        completed = sum(1 for r in self.records if r.completed)
+        avg_rating = sum(r.rating for r in self.records) / total if total > 0 else 0
         
         return {
-            "total_days": total_days,
-            "completed_days": completed_days,
-            "completion_rate": completed_days / total_days * 100 if total_days > 0 else 0,
-            "average_rating": avg_rating,
-            "total_challenges": len(all_challenges),
-            "unique_challenges": list(set(all_challenges))
+            "total_days": total,
+            "completed_days": completed,
+            "completion_rate": completed / total * 100 if total > 0 else 0,
+            "average_rating": avg_rating
         }
     
     def generate_report(self) -> str:
-        """生成复盘报告"""
+        """生成报告"""
         stats = self.calculate_stats()
         
         report = f"""# Week 2 复盘报告
 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-## 📊 学习统计
-- 总天数: {stats['total_days']}
-- 完成天数: {stats['completed_days']}
+## 学习统计
+- 完成天数: {stats['completed_days']}/{stats['total_days']}
 - 完成率: {stats['completion_rate']:.1f}%
 - 平均评分: {stats['average_rating']:.1f}/5
-- 遇到的挑战数: {stats['total_challenges']}
 
-## 🎯 学习目标完成情况
+## 学习目标完成情况
 
 """
         
         for i, goal in enumerate(self.goals, 1):
             if i <= len(self.records):
                 record = self.records[i-1]
-                status = "✅" if record.completed else "❌"
-                rating = "⭐" * record.rating
-                report += f"{i}. {status} {goal} {rating}\n"
+                status = "完成" if record.completed else "未完成"
+                rating = "★" * record.rating + "☆" * (5 - record.rating)
+                report += f"{i}. [{status}] {goal} {rating}\n"
             else:
-                report += f"{i}. ❌ {goal}\n"
+                report += f"{i}. [未完成] {goal}\n"
         
-        report += "\n## 📅 每日学习记录\n\n"
+        report += "\n## 每日学习记录\n\n"
         
         for record in self.records:
-            status = "✅" if record.completed else "❌"
+            status = "完成" if record.completed else "未完成"
             report += f"### Day {record.day}: {record.topic}\n"
             report += f"- 状态: {status}\n"
-            report += f"- 评分: {'⭐' * record.rating}/5\n"
+            report += f"- 评分: {'★' * record.rating}/5\n"
             report += "- 主要收获:\n"
             for learning in record.key_learnings:
                 report += f"  - {learning}\n"
@@ -398,60 +794,64 @@ class Week2Review:
                 report += f"  - {challenge}\n"
             report += "\n"
         
-        report += f"""## 🔍 问题与挑战
+        report += """## 技术收获
 
-### 主要挑战
-"""
-        for challenge in stats['unique_challenges']:
-            report += f"- {challenge}\n"
-        
-        report += """
-### 解决方案
-1. **FastAPI 学习**: 通过官方文档和示例代码快速上手
-2. **SQLAlchemy 2.0**: 理解新语法，参考迁移指南
-3. **JWT 认证**: 学习 OAuth 2.0 规范，理解令牌机制
-4. **WebSocket**: 实践实时通信，处理连接管理
+### FastAPI
+- 高性能的 Python Web 框架
+- 自动生成 API 文档
+- 类型安全的数据验证
 
-## 💡 经验总结
+### SQLAlchemy 2.0
+- 现代化的 ORM
+- 支持异步操作
+- 类型注解支持
 
-### 技术收获
-1. **FastAPI**: 现代化的 Python Web 框架，性能优秀
-2. **Pydantic v2**: 强大的数据验证，自动生成文档
-3. **SQLAlchemy 2.0**: 新的异步支持，更简洁的语法
-4. **JWT**: 安全的认证机制，适合无状态 API
-5. **WebSocket**: 实时通信的关键技术
+### JWT 认证
+- 无状态的认证机制
+- 访问令牌 + 刷新令牌
+- 安全的密码哈希
 
-### 最佳实践
-1. **代码组织**: 使用路由模块化组织代码
-2. **错误处理**: 统一的错误响应格式
-3. **测试策略**: 单元测试 + 集成测试
-4. **文档生成**: 自动 API 文档，降低维护成本
+### WebSocket
+- 实时双向通信
+- 连接管理
+- 广播和私聊
 
-## 🚀 下周计划
+### 结构化输出
+- Pydantic Schema 验证
+- JSON Mode
+- LLM 输出规范化
 
-### Week 3: LLM 基础
-- NLP 基础 + 文本表示演进
-- Transformer 架构：自注意力机制（概念级）
-- 大模型概览：GPT/Claude/LLaMA 架构对比
-- 提示工程：Few-shot / CoT / 结构化输出
-- "When NOT to build agents" 判断框架
-- LLM API 工程实践：流式调用 + Token 管理
-- 复盘
+## 改进点
 
-### 学习建议
-1. **理论与实践结合**: 每个概念都要有代码实践
-2. **深入理解原理**: 不仅会用，还要理解为什么
-3. **记录学习笔记**: 使用 Obsidian 整理知识
-4. **定期复习**: 巩固学过的内容
+1. **时间管理**: 合理分配每天的学习时间
+2. **代码实践**: 增加动手实践的时间
+3. **测试覆盖**: 提高测试覆盖率
+4. **文档编写**: 及时编写技术文档
+
+## Week 3 计划
+
+### 学习主题
+- NLP 基础
+- Transformer 架构
+- 大模型概览
+- 提示工程
+- Agent 判断框架
+- LLM API 工程
+
+### 学习策略
+1. 概念先行，理解原理
+2. 动手实践，代码演示
+3. 对比学习，加深理解
+4. 问题驱动，高效学习
 """
         
         return report
 
-def create_week2_review():
-    """创建 Week 2 复盘数据"""
+
+def create_sample_review():
+    """创建示例复盘数据"""
     review = Week2Review()
     
-    # 添加每日记录
     records = [
         DailyRecord(
             day=1,
@@ -544,52 +944,94 @@ def create_week2_review():
     
     return review
 
+
 if __name__ == "__main__":
     # 创建复盘数据
-    review = create_week2_review()
+    review = create_sample_review()
     
     # 生成报告
     report = review.generate_report()
+    
+    # 打印报告
+    print(report)
     
     # 保存报告
     with open("week2_review.md", "w", encoding="utf-8") as f:
         f.write(report)
     
-    print("✅ Week 2 复盘报告已生成")
-    print("\n报告预览:")
-    print(report[:1000] + "...")
+    print("\n复盘报告已保存到 week2_review.md")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 测试数据库问题 | 使用 SQLite 内存数据库，测试后清理 |
-| 2 | 测试用例不通过 | 检查测试数据，确保隔离性 |
-| 3 | 复盘内容空洞 | 结合具体代码示例，记录真实过程 |
-| 4 | 时间管理不当 | 优先测试核心功能，逐步完善 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| 单元测试 | 测试单个函数或方法 |
-| 集成测试 | 测试多个组件协同工作 |
-| 测试覆盖率 | 测试覆盖的代码比例 |
-| Mock | 模拟对象，用于隔离测试 |
-| Fixture | 测试前的准备和清理工作 |
-| 复盘 | 回顾总结，找出改进点 |
+## 验证清单
 
-## ✅ 验收清单
-- [ ] 编写完整的测试用例
+完成今日学习后，检查以下项目：
+
+- [ ] 安装了测试依赖
+- [ ] 配置了测试数据库
+- [ ] 编写了模型测试
+- [ ] 编写了 CRUD 测试
+- [ ] 编写了 API 测试
 - [ ] 所有测试通过
-- [ ] 生成完整的复盘报告
-- [ ] 制定 Week 3 学习计划
+- [ ] 完成了 Week 2 复盘报告
+- [ ] 制定了 Week 3 学习计划
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+---
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+## Week 2 总结
+
+### 技术栈
+
+- **FastAPI**: 高性能 Web 框架
+- **Pydantic**: 数据验证和序列化
+- **SQLAlchemy 2.0**: ORM 数据库操作
+- **JWT**: 无状态认证
+- **WebSocket**: 实时通信
+- **Pytest**: 测试框架
+
+### 核心概念
+
+1. **RESTful API**: 基于资源的 API 设计
+2. **依赖注入**: 自动管理依赖关系
+3. **中间件**: 请求/响应处理管道
+4. **结构化输出**: LLM 输出规范化
+5. **测试驱动**: 测试是代码质量的保证
+
+### 项目成果
+
+- 完整的任务管理 API
+- 用户认证系统
+- 实时聊天应用
+- 结构化输出服务
+- 完整的测试套件
+
+---
+
+## Week 3 预告
+
+### 学习主题
+
+- NLP 基础和文本表示
+- Transformer 架构
+- 大模型概览
+- 提示工程
+- Agent 判断框架
+- LLM API 工程
+
+### 学习目标
+
+1. 理解 NLP 基础概念
+2. 了解 Transformer 架构
+3. 对比主流大模型
+4. 掌握提示工程技巧
+5. 理解 Agent 适用场景
+6. 掌握 LLM API 工程
+
+---
+
+## 参考资源
+
+- [Pytest 文档](https://docs.pytest.org/)
+- [FastAPI 测试教程](https://fastapi.tiangolo.com/tutorial/testing/)
+- [SQLAlchemy 测试](https://docs.sqlalchemy.org/en/20/orm/testing.html)

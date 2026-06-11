@@ -1,97 +1,148 @@
-# 📅 Week 2 Day 4：JWT 认证 + 中间件
+# Day 4: JWT 认证 + 中间件
 
-## 🧭 今日方向
-> 今天我们将学习 JWT 认证机制和 FastAPI 中间件，为 API 添加安全防护和横切关注点处理。
+## 今日学习目标
 
-## 🎯 生活比喻
-> JWT 就像身份证，证明你是你；中间件就像安检系统，每个进出的人都要经过检查。
-
-## 📋 今日三件事
-1. 实现 JWT 令牌生成和验证
-2. 构建用户认证系统
+1. 理解 JWT（JSON Web Token）的工作原理
+2. 实现用户认证系统
 3. 创建自定义中间件
+4. 保护 API 端点
+5. 理解 CORS 配置
 
-## 🗺️ 手把手路线
+---
 
-### Step 1: JWT 基础
-- **做什么**: 学习 JWT 的结构和工作原理
-- **为什么**: JWT 是现代 Web 应用最常用的认证方式
-- **成功标志**: 能生成和验证 JWT 令牌
+## 第一部分：JWT 基础
 
-### Step 2: 认证系统
-- **做什么**: 实现完整的用户登录和令牌刷新
-- **为什么**: 安全的认证系统是 API 的基础
-- **成功标志**: 能完成登录、注册、令牌刷新
+### 什么是 JWT？
 
-### Step 3: 中间件
-- **做什么**: 创建自定义中间件处理日志、限流等
-- **为什么**: 中间件是处理横切关注点的好方法
-- **成功标志**: 能创建和使用自定义中间件
+**类比理解：**
+JWT 就像身份证：
+- 包含你的身份信息（payload）
+- 由权威机构签发（签名）
+- 在有效期内有效（过期时间）
+- 携带方便，随时可以验证
 
-## 💻 代码区
+### JWT 结构
+
+```
+JWT = Header.Payload.Signature
+
+Header（头部）:
+{
+  "alg": "HS256",      // 签名算法
+  "typ": "JWT"         // 令牌类型
+}
+
+Payload（载荷）:
+{
+  "sub": "1234567890", // 用户ID
+  "name": "John Doe",  // 用户名
+  "iat": 1516239022,   // 签发时间
+  "exp": 1516242622    // 过期时间
+}
+
+Signature（签名）:
+HMACSHA256(
+  base64UrlEncode(header) + "." + base64UrlEncode(payload),
+  secret
+)
+```
+
+### JWT 流程
+
+```
+1. 用户登录
+   ↓
+2. 服务器验证用户名密码
+   ↓
+3. 服务器生成 JWT
+   ↓
+4. 返回 JWT 给客户端
+   ↓
+5. 客户端存储 JWT（localStorage/Cookie）
+   ↓
+6. 后续请求携带 JWT（Authorization 头）
+   ↓
+7. 服务器验证 JWT
+   ↓
+8. 处理请求并返回响应
+```
+
+---
+
+## 第二部分：环境配置
+
+### 安装依赖
+
+```bash
+# 安装认证相关依赖
+pip install python-jose[cryptography] passlib[bcrypt]
+
+# 验证安装
+pip list | grep -i "jose\|passlib"
+```
+
+**预期输出：**
+```
+python-jose              3.3.0
+passlib                  1.7.4
+```
+
+---
+
+## 第三部分：完整认证系统
+
+### 文件：app/core/security.py
 
 ```python
-# JWT 认证实现
+"""
+安全相关工具函数
+"""
 
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+import os
 
-# 配置
-SECRET_KEY = "your-secret-key-keep-it-secret"  # 实际应用中应从环境变量获取
+# ==================== 配置 ====================
+
+# 密钥（实际应用中应从环境变量获取）
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-keep-it-secret-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-# 密码哈希
+# ==================== 密码哈希 ====================
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# 安全方案
-security = HTTPBearer()
 
-# 数据模型
-class Token(BaseModel):
-    """令牌模型"""
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-class TokenData(BaseModel):
-    """令牌数据"""
-    username: Optional[str] = None
-    user_id: Optional[int] = None
-
-class UserCreate(BaseModel):
-    """创建用户"""
-    username: str
-    email: str
-    password: str
-
-class UserResponse(BaseModel):
-    """用户响应"""
-    id: int
-    username: str
-    email: str
-
-# 模拟用户数据库
-users_db = {}
-user_id_counter = 1
-
-# JWT 工具函数
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password: str) -> str:
     """获取密码哈希"""
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """创建访问令牌"""
+
+# ==================== JWT 令牌 ====================
+
+def create_access_token(
+    data: dict, 
+    expires_delta: Optional[timedelta] = None
+) -> str:
+    """
+    创建访问令牌
+    
+    Args:
+        data: 令牌数据
+        expires_delta: 过期时间增量
+    
+    Returns:
+        JWT 令牌字符串
+    """
     to_encode = data.copy()
     
     if expires_delta:
@@ -99,181 +150,519 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "type": "access"
+    })
+    
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 def create_refresh_token(data: dict) -> str:
-    """创建刷新令牌"""
+    """
+    创建刷新令牌
+    
+    Args:
+        data: 令牌数据
+    
+    Returns:
+        JWT 令牌字符串
+    """
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "type": "refresh"
+    })
+    
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_token(token: str) -> TokenData:
-    """验证令牌"""
+
+def decode_token(token: str) -> Optional[dict]:
+    """
+    解码 JWT 令牌
+    
+    Args:
+        token: JWT 令牌字符串
+    
+    Returns:
+        令牌数据字典，如果无效则返回 None
+    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        user_id: int = payload.get("user_id")
-        
-        if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的认证凭证"
-            )
-        
-        return TokenData(username=username, user_id=user_id)
-    
+        return payload
     except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的认证凭证"
-        )
+        return None
 
-# 依赖注入
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """获取当前用户"""
-    token = credentials.credentials
-    token_data = verify_token(token)
+
+def get_token_data(token: str) -> Optional[dict]:
+    """
+    获取令牌数据
     
-    user = users_db.get(token_data.username)
+    Args:
+        token: JWT 令牌字符串
+    
+    Returns:
+        包含用户信息的字典
+    """
+    payload = decode_token(token)
+    if payload is None:
+        return None
+    
+    # 检查令牌类型
+    if payload.get("type") != "access":
+        return None
+    
+    return {
+        "user_id": payload.get("sub"),
+        "username": payload.get("username")
+    }
+```
+
+### 文件：app/core/deps.py
+
+```python
+"""
+FastAPI 依赖注入函数
+"""
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+from typing import Optional
+
+from app.database import get_db
+from app.models.user import User
+from app.crud.user import get_user, get_user_by_username
+from app.core.security import get_token_data
+
+# 安全方案
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    获取当前认证用户
+    
+    用法：
+    @app.get("/protected")
+    async def protected_endpoint(current_user: User = Depends(get_current_user)):
+        return {"user": current_user.username}
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效的认证凭证",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    token = credentials.credentials
+    token_data = get_token_data(token)
+    
+    if token_data is None:
+        raise credentials_exception
+    
+    user = get_user(db, user_id=token_data["user_id"])
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户不存在"
-        )
+        raise credentials_exception
     
     return user
 
-# FastAPI 应用
-app = FastAPI(title="Agent Factory API - JWT 认证")
 
-@app.post("/auth/register", response_model=UserResponse)
-async def register(user: UserCreate):
-    """用户注册"""
-    global user_id_counter
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    获取当前激活用户
     
+    用法：
+    @app.get("/active")
+    async def active_endpoint(user: User = Depends(get_current_active_user)):
+        return {"user": user.username}
+    """
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="用户未激活"
+        )
+    return current_user
+
+
+async def get_current_superuser(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """
+    获取当前超级管理员
+    
+    用法：
+    @app.get("/admin")
+    async def admin_endpoint(admin: User = Depends(get_current_superuser)):
+        return {"admin": admin.username}
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限"
+        )
+    return current_user
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    获取可选的当前用户（不强制认证）
+    
+    用法：
+    @app.get("/optional")
+    async def optional_endpoint(user: Optional[User] = Depends(get_optional_user)):
+        if user:
+            return {"user": user.username}
+        return {"user": None}
+    """
+    if credentials is None:
+        return None
+    
+    token = credentials.credentials
+    token_data = get_token_data(token)
+    
+    if token_data is None:
+        return None
+    
+    return get_user(db, user_id=token_data["user_id"])
+```
+
+### 文件：app/api/auth.py
+
+```python
+"""
+认证 API 路由
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
+from app.database import get_db
+from app.models.user import User
+from app.schemas.user import UserCreate, UserResponse
+from app.crud.user import (
+    get_user_by_username, 
+    create_user,
+    update_last_login
+)
+from app.core.security import (
+    verify_password, 
+    get_password_hash,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
+from app.core.deps import get_current_user
+
+router = APIRouter(prefix="/auth", tags=["认证"])
+
+
+# ==================== 请求/响应模型 ====================
+
+class TokenResponse(BaseModel):
+    """令牌响应"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class RefreshTokenRequest(BaseModel):
+    """刷新令牌请求"""
+    refresh_token: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求"""
+    old_password: str
+    new_password: str
+
+
+# ==================== 认证端点 ====================
+
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="用户注册"
+)
+async def register(user_in: UserCreate, db: Session = Depends(get_db)):
+    """用户注册"""
     # 检查用户名是否已存在
-    if user.username in users_db:
+    if get_user_by_username(db, user_in.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在"
         )
     
     # 创建用户
-    hashed_password = get_password_hash(user.password)
-    new_user = {
-        "id": user_id_counter,
-        "username": user.username,
-        "email": user.email,
-        "hashed_password": hashed_password
-    }
+    password_hash = get_password_hash(user_in.password)
+    user = create_user(db, user_in, password_hash)
     
-    users_db[user.username] = new_user
-    user_id_counter += 1
-    
-    return new_user
+    return user
 
-@app.post("/auth/login", response_model=Token)
-async def login(username: str, password: str):
+
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="用户登录"
+)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     """用户登录"""
-    user = users_db.get(username)
+    # 获取用户
+    user = get_user_by_username(db, form_data.username)
     
-    if not user or not verify_password(password, user["hashed_password"]):
+    # 验证用户名和密码
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误"
+            detail="用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # 检查用户是否激活
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="用户未激活"
         )
     
     # 创建令牌
+    from datetime import timedelta
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": username, "user_id": user["id"]},
+        data={"sub": str(user.id), "username": user.username},
         expires_delta=access_token_expires
     )
     refresh_token = create_refresh_token(
-        data={"sub": username, "user_id": user["id"]}
+        data={"sub": str(user.id), "username": user.username}
     )
     
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer"
-    }
-
-@app.post("/auth/refresh", response_model=Token)
-async def refresh_token(refresh_token: str):
-    """刷新令牌"""
-    try:
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的刷新令牌"
-            )
-        
-        username = payload.get("sub")
-        user = users_db.get(username)
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="用户不存在"
-            )
-        
-        # 创建新令牌
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        new_access_token = create_access_token(
-            data={"sub": username, "user_id": user["id"]},
-            expires_delta=access_token_expires
-        )
-        new_refresh_token = create_refresh_token(
-            data={"sub": username, "user_id": user["id"]}
-        )
-        
-        return {
-            "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
-            "token_type": "bearer"
-        }
+    # 更新最后登录时间
+    update_last_login(db, user)
     
-    except JWTError:
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="刷新令牌"
+)
+async def refresh_token(
+    request: RefreshTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """使用刷新令牌获取新的访问令牌"""
+    from datetime import timedelta
+    
+    # 解码刷新令牌
+    payload = decode_token(request.refresh_token)
+    
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的刷新令牌"
         )
+    
+    # 检查令牌类型
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的令牌类型"
+        )
+    
+    # 获取用户
+    user_id = payload.get("sub")
+    user = get_user_by_username(db, payload.get("username"))
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户不存在"
+        )
+    
+    # 创建新令牌
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": str(user.id), "username": user.username},
+        expires_delta=access_token_expires
+    )
+    new_refresh_token = create_refresh_token(
+        data={"sub": str(user.id), "username": user.username}
+    )
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
 
-@app.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    """获取当前用户信息"""
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="获取当前用户信息"
+)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user)
+):
+    """获取当前登录用户的信息"""
     return current_user
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+@router.post(
+    "/change-password",
+    summary="修改密码"
+)
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """修改当前用户的密码"""
+    # 验证旧密码
+    if not verify_password(request.old_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="旧密码错误"
+        )
+    
+    # 更新密码
+    new_password_hash = get_password_hash(request.new_password)
+    current_user.password_hash = new_password_hash
+    current_user.updated_at = datetime.utcnow()
+    
+    db.commit()
+    
+    return {"message": "密码修改成功"}
 ```
 
+### 文件：app/main.py（更新版本）
+
 ```python
-# 自定义中间件
+"""
+Agent Factory API - 带认证的完整版本
+"""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
+from app.database import init_db
+from app.api import auth, users, tasks
+
+
+# 应用生命周期
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时
+    print("正在启动应用...")
+    init_db()
+    print("数据库初始化完成")
+    
+    yield
+    
+    # 关闭时
+    print("正在关闭应用...")
+
+
+# 创建应用
+app = FastAPI(
+    title="Agent Factory API",
+    description="智能体工厂的后端 API 服务",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# ==================== 中间件配置 ====================
+
+# CORS 中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 生产环境应该限制
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==================== 注册路由 ====================
+
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(tasks.router, prefix="/api/v1")
+
+
+# 根端点
+@app.get("/")
+async def root():
+    """根端点"""
+    return {
+        "message": "Agent Factory API",
+        "version": "0.1.0",
+        "docs": "/docs"
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """健康检查"""
+    return {"status": "healthy"}
+```
+
+---
+
+## 第四部分：中间件
+
+### 文件：app/middleware/logging.py
+
+```python
+"""
+日志中间件
+"""
 
 import time
 import logging
-from fastapi import FastAPI, Request, Response
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Callable, Dict
-from collections import defaultdict
-from datetime import datetime, timedelta
+from typing import Callable
 
-# 日志配置
+# 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 1. 日志中间件
+
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """日志中间件"""
+    """日志中间件 - 记录所有请求和响应"""
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 请求开始时间
@@ -281,6 +670,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         
         # 记录请求信息
         logger.info(f"请求开始: {request.method} {request.url.path}")
+        logger.info(f"客户端IP: {request.client.host}")
         
         # 处理请求
         response = await call_next(request)
@@ -299,16 +689,36 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         response.headers["X-Process-Time"] = str(process_time)
         
         return response
+```
 
-# 2. 限流中间件
+### 文件：app/middleware/rate_limit.py
+
+```python
+"""
+限流中间件
+"""
+
+import time
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+from typing import Callable, Dict, List
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """限流中间件"""
+    """限流中间件 - 限制请求频率"""
     
-    def __init__(self, app, max_requests: int = 100, window_seconds: int = 60):
+    def __init__(
+        self, 
+        app, 
+        max_requests: int = 100, 
+        window_seconds: int = 60
+    ):
         super().__init__(app)
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self.requests: Dict[str, list] = defaultdict(list)
+        self.requests: Dict[str, List[datetime]] = defaultdict(list)
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 获取客户端 IP
@@ -342,81 +752,29 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
         
         return response
-
-# 3. CORS 中间件配置
-from fastapi.middleware.cors import CORSMiddleware
-
-# 创建应用
-app = FastAPI(title="Agent Factory API - 中间件示例")
-
-# 添加中间件
-app.add_middleware(LoggingMiddleware)
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应该限制
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 测试端点
-@app.get("/")
-async def root():
-    return {"message": "中间件测试"}
-
-@app.get("/slow")
-async def slow_endpoint():
-    """慢端点测试"""
-    import asyncio
-    await asyncio.sleep(1)
-    return {"message": "慢响应完成"}
-
-@app.get("/fast")
-async def fast_endpoint():
-    """快端点测试"""
-    return {"message": "快响应完成"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
+### 文件：app/middleware/request_id.py
+
 ```python
-# 中间件组合使用示例
+"""
+请求 ID 中间件
+"""
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-import time
-from typing import Callable
+import uuid
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from typing import Callable
 
-app = FastAPI()
 
-# 1. 安全头中间件
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """安全头中间件"""
-    
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        response = await call_next(request)
-        
-        # 添加安全头
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        
-        return response
-
-# 2. 请求 ID 中间件
 class RequestIDMiddleware(BaseHTTPMiddleware):
-    """请求 ID 中间件"""
+    """请求 ID 中间件 - 为每个请求生成唯一 ID"""
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        import uuid
-        
         # 生成请求 ID
         request_id = str(uuid.uuid4())
+        
+        # 存储到 request.state
         request.state.request_id = request_id
         
         # 处理请求
@@ -426,83 +784,127 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         response.headers["X-Request-ID"] = request_id
         
         return response
-
-# 3. 性能监控中间件
-class PerformanceMiddleware(BaseHTTPMiddleware):
-    """性能监控中间件"""
-    
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        start_time = time.time()
-        
-        response = await call_next(request)
-        
-        process_time = time.time() - start_time
-        
-        # 记录慢请求
-        if process_time > 1.0:
-            logger.warning(
-                f"慢请求: {request.method} {request.url.path} "
-                f"耗时: {process_time:.4f}s"
-            )
-        
-        return response
-
-# 添加所有中间件
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RequestIDMiddleware)
-app.add_middleware(PerformanceMiddleware)
-
-@app.get("/api/v1/data")
-async def get_data():
-    """获取数据端点"""
-    return {"data": "示例数据"}
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """全局异常处理器"""
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "服务器内部错误",
-            "request_id": getattr(request.state, "request_id", None)
-        }
-    )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | JWT 令牌无效 | 检查密钥是否正确，令牌是否过期 |
-| 2 | 密码验证失败 | 确保使用正确的哈希算法 |
-| 3 | 中间件不生效 | 检查中间件添加顺序，后添加的先执行 |
-| 4 | 限流不准确 | 检查时间窗口计算，确保清理过期记录 |
+### 文件：app/middleware/__init__.py
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| JWT | JSON Web Token，用于安全传输信息 |
-| 访问令牌 | 短期有效的认证令牌 |
-| 刷新令牌 | 长期有效的令牌，用于获取新访问令牌 |
-| 中间件 | 在请求/响应处理管道中插入的处理程序 |
-| CORS | 跨源资源共享，处理跨域请求 |
-| 限流 | 限制客户端请求频率 |
+```python
+"""
+中间件包
+"""
 
-## ✅ 验收清单
-- [ ] 能生成和验证 JWT 令牌
-- [ ] 实现完整的用户认证流程
-- [ ] 创建自定义中间件
-- [ ] 理解中间件执行顺序
+from app.middleware.logging import LoggingMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.request_id import RequestIDMiddleware
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+__all__ = ["LoggingMiddleware", "RateLimitMiddleware", "RequestIDMiddleware"]
+```
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+---
+
+## 第五部分：测试认证流程
+
+### 完整测试脚本
+
+```bash
+#!/bin/bash
+# test_auth.sh - 认证测试脚本
+
+BASE_URL="http://localhost:8000/api/v1"
+
+echo "=== 1. 用户注册 ==="
+curl -X POST "$BASE_URL/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "full_name": "Test User",
+    "password": "SecurePass123"
+  }' | jq .
+
+echo -e "\n=== 2. 用户登录 ==="
+LOGIN_RESPONSE=$(curl -X POST "$BASE_URL/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=testuser&password=SecurePass123")
+
+echo $LOGIN_RESPONSE | jq .
+
+# 提取令牌
+ACCESS_TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.access_token')
+REFRESH_TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.refresh_token')
+
+echo -e "\n=== 3. 获取当前用户信息 ==="
+curl -X GET "$BASE_URL/auth/me" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq .
+
+echo -e "\n=== 4. 访问受保护端点（需要认证）==="
+curl -X GET "$BASE_URL/users/1" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq .
+
+echo -e "\n=== 5. 刷新令牌 ==="
+curl -X POST "$BASE_URL/auth/refresh" \
+  -H "Content-Type: application/json" \
+  -d "{\"refresh_token\": \"$REFRESH_TOKEN\"}" | jq .
+
+echo -e "\n=== 6. 修改密码 ==="
+curl -X POST "$BASE_URL/auth/change-password" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "old_password": "SecurePass123",
+    "new_password": "NewSecurePass456"
+  }' | jq .
+
+echo -e "\n=== 7. 重新登录 ==="
+curl -X POST "$BASE_URL/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=testuser&password=NewSecurePass456" | jq .
+```
+
+---
+
+## 验证清单
+
+完成今日学习后，检查以下项目：
+
+- [ ] 理解 JWT 的结构和工作原理
+- [ ] 实现了密码哈希功能
+- [ ] 实现了用户注册端点
+- [ ] 实现了用户登录端点
+- [ ] 实现了令牌刷新端点
+- [ ] 创建了认证依赖注入函数
+- [ ] 创建了自定义中间件
+- [ ] 测试了完整的认证流程
+- [ ] 理解了 CORS 配置
+
+---
+
+## 今日小结
+
+| 概念 | 关键点 |
+|------|--------|
+| JWT | JSON Web Token，无状态认证 |
+| 访问令牌 | 短期有效，用于 API 访问 |
+| 刷新令牌 | 长期有效，用于获取新访问令牌 |
+| 密码哈希 | bcrypt 单向加密 |
+| 中间件 | 请求/响应处理管道 |
+| CORS | 跨源资源共享配置 |
+| 依赖注入 | 自动提供认证用户 |
+
+---
+
+## 明日预告
+
+明天我们将学习：
+- WebSocket 基础
+- 实时通信
+- 聊天应用实现
+- 连接管理
+
+---
+
+## 参考资源
+
+- [JWT 官方文档](https://jwt.io/)
+- [FastAPI 安全教程](https://fastapi.tiangolo.com/tutorial/security/)
+- [OAuth 2.0 规范](https://oauth.net/2/)

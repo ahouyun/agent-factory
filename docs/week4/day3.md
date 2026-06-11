@@ -1,501 +1,614 @@
-# 📅 Week 4 Day 3：Plan-and-Solve 范式
+# 📅 Week 4 Day 3：Plan-and-Solve 范式——先规划后执行
 
 ## 🧭 今日方向
-> 今天我们将学习 Plan-and-Solve 范式，这是一种先规划后执行的 Agent 设计模式。
+> 学习 Plan-and-Solve（先规划后执行）范式——将复杂目标分解为有依赖关系的子任务，然后按序或并行执行。掌握 Planner（规划器）和 Executor（执行器）的设计，以及任务失败时的重新规划。
 
 ## 🎯 生活比喻
-> Plan-and-Solve 就像项目经理：先制定详细计划（Plan），然后按计划执行（Solve），遇到问题再调整计划。
+> Plan-and-Solve 就像搬家：你不会直接开始搬东西，而是先列清单（规划）——"先打包厨房，再打包卧室，然后叫搬家公司，最后验收"。每个步骤有先后顺序（依赖），如果打包时发现箱子不够，就要调整计划（重规划）。
 
 ## 📋 今日三件事
-1. 理解 Plan-and-Solve 的工作原理
-2. 学习规划算法和执行策略
-3. 通过代码实践 Plan-and-Solve 模式
+1. 理解任务分解、依赖关系、执行顺序的概念
+2. 实现一个完整的 Plan-and-Solve Agent（Planner + Executor + 重规划）
+3. 运行"策划公司活动"的完整示例，观察 5+ 子任务的执行过程
+
+---
 
 ## 🗺️ 手把手路线
 
-### Step 1: 规划原理
-- **做什么**: 理解如何将复杂任务分解为子任务
-- **为什么**: 规划是解决复杂问题的关键
-- **成功标志**: 能设计任务分解策略
+### Step 1: 设计任务模型
+- **做什么**: 定义 Task（任务）和 Plan（计划）的数据结构
+- **为什么**: 清晰的数据模型是实现的基础
+- **成功标志**: 能定义包含状态、依赖关系的 Task 类
 
-### Step 2: 执行策略
-- **做什么**: 学习如何按计划执行任务
-- **为什么**: 好的执行策略确保计划落地
-- **成功标志**: 能实现任务执行器
+### Step 2: 实现规划器
+- **做什么**: 实现 Planner 类，能将目标分解为任务列表并确定依赖
+- **为什么**: 规划是 Plan-and-Solve 的核心
+- **成功标志**: 能将一个复杂目标分解为 5+ 个子任务
 
-### Step 3: 实践应用
-- **做什么**: 通过实际案例应用 Plan-and-Solve
-- **为什么**: 实践是最好的学习方式
-- **成功标志**: 能用 Plan-and-Solve 解决实际问题
+### Step 3: 实现执行器和重规划
+- **做什么**: 实现 Executor 类，按依赖顺序执行任务，失败时重新规划
+- **为什么**: 真实场景中任务可能失败，需要动态调整
+- **成功标志**: 能处理任务失败并重新规划
+
+---
 
 ## 💻 代码区
 
+### 代码 1: 任务模型和状态管理
+
 ```python
-# Plan-and-Solve 范式实现
+"""
+Plan-and-Solve 范式：任务模型和状态管理
+"""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Optional, Callable
 from enum import Enum
-import json
+import time
 
 class TaskStatus(str, Enum):
     """任务状态"""
-    PENDING = "pending"      # 待处理
-    IN_PROGRESS = "in_progress"  # 进行中
-    COMPLETED = "completed"  # 已完成
-    FAILED = "failed"        # 失败
+    PENDING = "pending"        # 待执行
+    IN_PROGRESS = "in_progress"  # 执行中
+    COMPLETED = "completed"    # 已完成
+    FAILED = "failed"          # 失败
+    SKIPPED = "skipped"        # 跳过
 
 @dataclass
 class Task:
-    """任务"""
-    id: str
-    description: str
+    """任务数据模型"""
+    id: str                          # 任务唯一ID
+    name: str                        # 任务名称
+    description: str                 # 任务描述
     status: TaskStatus = TaskStatus.PENDING
-    dependencies: List[str] = field(default_factory=list)
-    result: Optional[str] = None
-    subtasks: List['Task'] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)  # 依赖的任务ID列表
+    result: Optional[str] = None     # 执行结果
+    priority: int = 0                # 优先级（越高越先执行）
+    max_retries: int = 2             # 最大重试次数
+    retry_count: int = 0             # 当前重试次数
+
+    def can_execute(self, completed_tasks: Dict[str, TaskStatus]) -> bool:
+        """检查是否可以执行（所有依赖已完成）"""
+        for dep_id in self.dependencies:
+            if completed_tasks.get(dep_id) != TaskStatus.COMPLETED:
+                return False
+        return True
+
+    def __str__(self):
+        deps = ", ".join(self.dependencies) if self.dependencies else "无"
+        return f"[{self.id}] {self.name} (状态:{self.status.value}, 依赖:{deps})"
+
 
 @dataclass
 class Plan:
-    """计划"""
-    goal: str
-    tasks: List[Task]
-    estimated_steps: int
-    strategy: str
+    """计划数据模型"""
+    goal: str                           # 最终目标
+    tasks: List[Task]                   # 任务列表
+    strategy: str = "sequential"        # 执行策略
+    estimated_steps: int = 0            # 预估步骤数
+    created_at: float = 0.0            # 创建时间
+
+    def get_task_by_id(self, task_id: str) -> Optional[Task]:
+        """根据ID获取任务"""
+        for task in self.tasks:
+            if task.id == task_id:
+                return task
+        return None
+
+    def get_status_summary(self) -> Dict[str, int]:
+        """获取状态汇总"""
+        summary = {}
+        for status in TaskStatus:
+            count = sum(1 for t in self.tasks if t.status == status)
+            if count > 0:
+                summary[status.value] = count
+        return summary
+```
+
+### 代码 2: Planner 规划器
+
+```python
+"""
+Plan-and-Solve 范式：Planner 规划器
+负责将目标分解为任务列表并确定依赖关系
+"""
 
 class Planner:
-    """规划器"""
-    
+    """
+    规划器：将复杂目标分解为子任务
+
+    核心能力：
+    1. 分析目标复杂度
+    2. 分解为子任务
+    3. 确定任务依赖关系
+    4. 选择执行策略
+    """
+
     def __init__(self):
-        self.planning_strategies = {
-            "decomposition": "任务分解",
-            "sequential": "顺序执行",
-            "parallel": "并行执行",
-            "iterative": "迭代优化"
+        # 任务模板：不同目标类型的分解模板
+        self.decomposition_templates = {
+            "event": [
+                ("确定预算", "明确活动预算范围和资金来源"),
+                ("选择日期", "确定活动日期，检查场地可用性"),
+                ("预订场地", "联系场地方，签订合同"),
+                ("邀请嘉宾", "准备嘉宾名单，发送邀请函"),
+                ("安排餐饮", "联系餐饮供应商，确定菜单"),
+                ("布置现场", "设计现场布局，准备物料"),
+                ("活动执行", "按计划执行活动"),
+            ],
+            "project": [
+                ("需求分析", "收集和分析需求"),
+                ("方案设计", "设计技术方案和架构"),
+                ("开发实现", "编写代码实现功能"),
+                ("测试验证", "编写测试用例并执行"),
+                ("部署上线", "部署到生产环境"),
+            ],
+            "learning": [
+                ("调研资源", "查找学习资料和教程"),
+                ("制定计划", "安排学习时间和进度"),
+                ("基础学习", "学习核心概念和基础"),
+                ("实践练习", "通过项目实践巩固"),
+                ("总结复习", "回顾和总结学习内容"),
+            ],
         }
-    
-    def create_plan(self, goal: str, context: Dict = None) -> Plan:
-        """创建计划"""
-        print(f"\n📋 创建计划: {goal}")
-        
-        # 分析目标
-        analysis = self._analyze_goal(goal, context)
-        
-        # 分解任务
-        tasks = self._decompose_tasks(goal, analysis)
-        
-        # 确定依赖关系
-        self._determine_dependencies(tasks)
-        
-        # 选择策略
+
+    def create_plan(self, goal: str, goal_type: str = "event") -> Plan:
+        """
+        创建计划
+
+        参数:
+            goal: 目标描述
+            goal_type: 目标类型 (event/project/learning)
+        返回:
+            Plan 对象
+        """
+        print(f"\n📋 规划器开始工作")
+        print(f"  🎯 目标: {goal}")
+        print(f"  📁 类型: {goal_type}")
+
+        # 1. 获取分解模板
+        template = self.decomposition_templates.get(goal_type, [])
+
+        # 2. 分解为任务
+        tasks = self._decompose(goal, template)
+
+        # 3. 确定依赖关系
+        self._set_dependencies(tasks)
+
+        # 4. 选择策略
         strategy = self._select_strategy(tasks)
-        
+
         plan = Plan(
             goal=goal,
             tasks=tasks,
+            strategy=strategy,
             estimated_steps=len(tasks),
-            strategy=strategy
+            created_at=time.time(),
         )
-        
-        print(f"  任务数量: {len(tasks)}")
-        print(f"  执行策略: {strategy}")
-        
+
+        print(f"  📊 生成 {len(tasks)} 个子任务")
+        print(f"  🔧 执行策略: {strategy}")
+
         return plan
-    
-    def _analyze_goal(self, goal: str, context: Dict = None) -> Dict:
-        """分析目标"""
-        analysis = {
-            "complexity": "medium",
-            "required_tools": [],
-            "estimated_time": "medium",
-            "risk_level": "low"
-        }
-        
-        # 简化的分析逻辑
-        if len(goal) > 100:
-            analysis["complexity"] = "high"
-        elif len(goal) < 20:
-            analysis["complexity"] = "low"
-        
-        return analysis
-    
-    def _decompose_tasks(self, goal: str, analysis: Dict) -> List[Task]:
-        """分解任务"""
+
+    def _decompose(self, goal: str, template: list) -> List[Task]:
+        """将目标分解为子任务"""
         tasks = []
-        
-        # 根据目标创建任务
-        task_descriptions = [
-            f"理解目标: {goal}",
-            "收集必要信息",
-            "制定详细方案",
-            "执行方案",
-            "验证结果"
-        ]
-        
-        for i, desc in enumerate(task_descriptions):
+        for i, (name, desc) in enumerate(template):
             task = Task(
                 id=f"task_{i+1}",
-                description=desc,
-                status=TaskStatus.PENDING
+                name=name,
+                description=f"针对'{goal}': {desc}",
             )
             tasks.append(task)
-        
         return tasks
-    
-    def _determine_dependencies(self, tasks: List[Task]):
-        """确定依赖关系"""
-        for i, task in enumerate(tasks):
-            if i > 0:
-                task.dependencies.append(tasks[i-1].id)
-    
+
+    def _set_dependencies(self, tasks: List[Task]):
+        """设置任务间的依赖关系（线性依赖）"""
+        for i in range(1, len(tasks)):
+            tasks[i].dependencies.append(tasks[i-1].id)
+
     def _select_strategy(self, tasks: List[Task]) -> str:
-        """选择执行策略"""
-        # 简化的策略选择
+        """根据任务数量选择执行策略"""
         if len(tasks) <= 3:
             return "sequential"
         elif len(tasks) <= 6:
-            return "parallel"
+            return "sequential_with_checkpoints"
         else:
             return "iterative"
 
+    def replan(self, original_plan: Plan, failed_task: Task) -> Plan:
+        """
+        重新规划：当任务失败时调整计划
+
+        策略：
+        1. 标记失败任务为跳过
+        2. 移除依赖失败任务的后续依赖
+        3. 如果是关键任务，尝试替代方案
+        """
+        print(f"\n🔄 重新规划中...")
+        print(f"  ❌ 失败任务: {failed_task.name}")
+
+        # 重新创建任务列表
+        new_tasks = []
+        for task in original_plan.tasks:
+            if task.id == failed_task.id:
+                task.status = TaskStatus.SKIPPED
+                print(f"  ⏭️ 跳过: {task.name}")
+            else:
+                # 移除对失败任务的依赖
+                if failed_task.id in task.dependencies:
+                    task.dependencies.remove(failed_task.id)
+                    print(f"  🔗 移除依赖: {task.name} 不再依赖 {failed_task.name}")
+            new_tasks.append(task)
+
+        new_plan = Plan(
+            goal=original_plan.goal,
+            tasks=new_tasks,
+            strategy=original_plan.strategy,
+            estimated_steps=len(new_tasks),
+            created_at=time.time(),
+        )
+
+        print(f"  📊 新计划包含 {len(new_tasks)} 个任务")
+        return new_plan
+```
+
+### 代码 3: Executor 执行器
+
+```python
+"""
+Plan-and-Solve 范式：Executor 执行器
+负责按依赖顺序执行任务，处理失败和重试
+"""
+
 class Executor:
-    """执行器"""
-    
-    def __init__(self, tools: Dict[str, Callable] = None):
-        self.tools = tools or {}
-        self.execution_log = []
-    
+    """
+    执行器：按计划执行任务
+
+    核心能力：
+    1. 按依赖顺序执行任务
+    2. 处理任务失败和重试
+    3. 记录执行日志
+    4. 返回执行结果
+    """
+
+    def __init__(self, action_registry: Optional[Dict[str, Callable]] = None):
+        """
+        参数:
+            action_registry: 动作注册表，映射任务名到执行函数
+        """
+        self.action_registry = action_registry or {}
+        self.execution_log: List[Dict] = []
+
+    def register_action(self, task_name: str, action_func: Callable):
+        """注册任务执行函数"""
+        self.action_registry[task_name] = action_func
+
     def execute_plan(self, plan: Plan) -> Dict:
-        """执行计划"""
-        print(f"\n🚀 开始执行计划: {plan.goal}")
-        
+        """
+        执行整个计划
+
+        返回:
+            包含所有任务结果的字典
+        """
+        print(f"\n🚀 开始执行计划")
+        print(f"  🎯 目标: {plan.goal}")
+        print(f"  📋 任务数: {len(plan.tasks)}")
+        print(f"  🔧 策略: {plan.strategy}")
+
         results = {}
-        
+
         for task in plan.tasks:
-            print(f"\n执行任务: {task.description}")
-            
-            # 检查依赖
-            if not self._check_dependencies(task, results):
-                print(f"  ⏸️ 等待依赖任务完成")
+            # 跳过已跳过的任务
+            if task.status == TaskStatus.SKIPPED:
+                print(f"\n  ⏭️ 跳过: {task.name}")
                 continue
-            
+
+            # 检查依赖是否满足
+            completed_statuses = {t.id: t.status for t in plan.tasks}
+            if not task.can_execute(completed_statuses):
+                print(f"\n  ⏳ 等待依赖: {task.name}")
+                continue
+
             # 执行任务
             result = self._execute_task(task)
             results[task.id] = result
-            
-            # 更新任务状态
+
+        return results
+
+    def _execute_task(self, task: Task) -> str:
+        """执行单个任务"""
+        print(f"\n  {'─' * 40}")
+        print(f"  📌 执行任务: {task.name}")
+        print(f"  📝 描述: {task.description}")
+        print(f"  🔗 依赖: {task.dependencies or '无'}")
+
+        task.status = TaskStatus.IN_PROGRESS
+
+        try:
+            # 查找并执行对应的action
+            if task.name in self.action_registry:
+                result = self.action_registry[task.name](task)
+            else:
+                # 默认执行逻辑
+                result = self._default_execute(task)
+
             task.status = TaskStatus.COMPLETED
             task.result = result
-            
+
+            print(f"  ✅ 完成: {result}")
+
             # 记录日志
             self.execution_log.append({
                 "task_id": task.id,
-                "description": task.description,
+                "task_name": task.name,
+                "status": "completed",
                 "result": result,
-                "status": "completed"
             })
-            
-            print(f"  ✅ 完成: {result[:100]}...")
-        
-        return results
-    
-    def _check_dependencies(self, task: Task, completed_tasks: Dict) -> bool:
-        """检查依赖是否满足"""
-        for dep_id in task.dependencies:
-            if dep_id not in completed_tasks:
-                return False
-        return True
-    
-    def _execute_task(self, task: Task) -> str:
-        """执行单个任务"""
-        # 模拟任务执行
-        import time
-        time.sleep(0.1)  # 模拟耗时
-        
-        # 根据任务类型执行
-        if "理解" in task.description:
-            return "目标已理解，关键要素已提取"
-        elif "收集" in task.description:
-            return "已收集必要信息，数据完整"
-        elif "制定" in task.description:
-            return "详细方案已制定，步骤清晰"
-        elif "执行" in task.description:
-            return "方案已执行，主要工作完成"
-        elif "验证" in task.description:
-            return "结果已验证，符合预期"
-        else:
-            return "任务完成"
+
+            return result
+
+        except Exception as e:
+            task.retry_count += 1
+            if task.retry_count <= task.max_retries:
+                print(f"  ⚠️ 失败 (重试 {task.retry_count}/{task.max_retries}): {e}")
+                task.status = TaskStatus.PENDING  # 重置为待执行
+                return f"重试中: {e}"
+            else:
+                task.status = TaskStatus.FAILED
+                print(f"  ❌ 最终失败: {e}")
+                self.execution_log.append({
+                    "task_id": task.id,
+                    "task_name": task.name,
+                    "status": "failed",
+                    "result": str(e),
+                })
+                return f"失败: {e}"
+
+    def _default_execute(self, task: Task) -> str:
+        """默认执行逻辑"""
+        # 模拟执行
+        time.sleep(0.05)
+        return f"{task.name} 已完成"
+
+    def get_log(self) -> List[Dict]:
+        """获取执行日志"""
+        return self.execution_log
+```
+
+### 代码 4: PlanAndSolveAgent 完整示例——策划公司活动
+
+```python
+"""
+Plan-and-Solve 完整示例：策划公司年终活动
+包含：规划 -> 执行 -> 失败处理 -> 重规划
+"""
 
 class PlanAndSolveAgent:
-    """Plan-and-Solve 智能体"""
-    
-    def __init__(self, name: str, tools: Dict[str, Callable] = None):
+    """
+    Plan-and-Solve Agent：先规划后执行
+
+    完整流程：
+    1. 接收目标
+    2. 规划器分解任务
+    3. 执行器按序执行
+    4. 失败时重新规划
+    5. 输出最终结果
+    """
+
+    def __init__(self, name: str):
         self.name = name
         self.planner = Planner()
-        self.executor = Executor(tools)
-    
-    def solve(self, goal: str, context: Dict = None) -> Dict:
-        """解决问题"""
-        print(f"\n{'='*60}")
-        print(f"🤖 {self.name} 开始解决问题")
-        print(f"目标: {goal}")
-        print(f"{'='*60}")
-        
+        self.executor = Executor()
+
+    def solve(self, goal: str, goal_type: str = "event") -> Dict:
+        """
+        解决问题的主入口
+
+        参数:
+            goal: 目标描述
+            goal_type: 目标类型
+        返回:
+            执行结果字典
+        """
+        print(f"\n{'=' * 60}")
+        print(f"🤖 [{self.name}] Plan-and-Solve Agent 启动")
+        print(f"🎯 目标: {goal}")
+        print(f"{'=' * 60}")
+
         # 1. 创建计划
-        plan = self.planner.create_plan(goal, context)
-        
+        plan = self.planner.create_plan(goal, goal_type)
+
         # 2. 打印计划
         self._print_plan(plan)
-        
+
         # 3. 执行计划
         results = self.executor.execute_plan(plan)
-        
-        # 4. 生成总结
-        summary = self._generate_summary(plan, results)
-        
+
+        # 4. 检查失败任务，重新规划
+        failed_tasks = [t for t in plan.tasks if t.status == TaskStatus.FAILED]
+        if failed_tasks:
+            print(f"\n⚠️ 有 {len(failed_tasks)} 个任务失败，尝试重新规划...")
+            for failed in failed_tasks:
+                plan = self.planner.replan(plan, failed)
+            # 重新执行
+            results.update(self.executor.execute_plan(plan))
+
+        # 5. 生成总结
+        summary = self._generate_summary(plan)
+
         return {
             "goal": goal,
             "plan": plan,
             "results": results,
-            "summary": summary
+            "summary": summary,
         }
-    
+
     def _print_plan(self, plan: Plan):
-        """打印计划"""
+        """打印计划详情"""
         print(f"\n📝 执行计划:")
         print(f"  目标: {plan.goal}")
         print(f"  策略: {plan.strategy}")
-        print(f"  任务数: {len(plan.tasks)}")
-        
+        print(f"  任务列表:")
         for task in plan.tasks:
-            deps = ", ".join(task.dependencies) if task.dependencies else "无"
-            print(f"  - [{task.id}] {task.description}")
-            print(f"    依赖: {deps}")
-    
-    def _generate_summary(self, plan: Plan, results: Dict) -> str:
-        """生成总结"""
-        completed = sum(1 for task in plan.tasks if task.status == TaskStatus.COMPLETED)
+            status_icon = {
+                TaskStatus.PENDING: "⏳",
+                TaskStatus.COMPLETED: "✅",
+                TaskStatus.FAILED: "❌",
+                TaskStatus.SKIPPED: "⏭️",
+            }.get(task.status, "❓")
+            deps = f" <- {task.dependencies}" if task.dependencies else ""
+            print(f"    {status_icon} [{task.id}] {task.name}{deps}")
+
+    def _generate_summary(self, plan: Plan) -> str:
+        """生成执行总结"""
+        summary = plan.get_status_summary()
+        completed = summary.get("completed", 0)
         total = len(plan.tasks)
-        
-        summary = f"""
-执行总结:
-- 目标: {plan.goal}
-- 完成任务: {completed}/{total}
-- 执行策略: {plan.strategy}
-- 总体状态: {'成功' if completed == total else '部分完成'}
-"""
-        return summary
 
-# 使用示例
-if __name__ == "__main__":
-    # 创建 Agent
-    agent = PlanAndSolveAgent(
-        name="任务规划助手",
-        tools={
-            "search": lambda query: f"搜索结果: {query}",
-            "calculate": lambda expr: f"计算结果: {eval(expr)}"
-        }
-    )
-    
-    # 解决问题
-    result = agent.solve("帮我制定一个学习 Python 的计划")
-    
-    # 打印结果
-    print(result["summary"])
-```
-
-```python
-# Plan-and-Solve 提示模板
-
-PLAN_AND_SOLVE_PROMPT = """
-你是一个能够规划和解决问题的AI助手。
-
-请使用以下步骤解决问题：
-
-Step 1: 理解问题
-- 分析问题的关键要素
-- 确定目标和约束条件
-
-Step 2: 制定计划
-- 将问题分解为子任务
-- 确定任务的执行顺序
-- 识别可能的障碍
-
-Step 3: 执行计划
-- 按顺序执行每个子任务
-- 记录执行结果
-- 处理遇到的问题
-
-Step 4: 验证结果
-- 检查是否达成目标
-- 总结经验和教训
-
-现在请解决问题：
-{problem}
-"""
-
-# 任务分解策略
-DECOMPOSITION_STRATEGIES = """
-任务分解策略
-===========
-
-1. 顺序分解
-   适用: 任务有明确的先后顺序
-   示例: 学习编程 → 基础语法 → 项目实践
-
-2. 并行分解
-   适用: 任务可以同时进行
-   示例: 数据收集 + 数据清洗
-
-3. 递归分解
-   适用: 任务可以不断细分
-   示例: 开发软件 → 模块 → 组件 → 函数
-
-4. 目标驱动分解
-   适用: 有明确目标的任务
-   示例: 提升销售额 → 营销 + 销售 + 服务
-
-5. 问题驱动分解
-   适用: 解决具体问题
-   示例: 系统故障 → 诊断 → 修复 → 验证
-"""
-
-print(DECOMPOSITION_STRATEGIES)
-```
-
-```python
-# Plan-and-Solve 实战：项目规划
-
-class ProjectPlanner:
-    """项目规划器"""
-    
-    def __init__(self):
-        self.project = {}
-    
-    def plan_project(self, project_name: str, requirements: List[str]) -> Dict:
-        """规划项目"""
-        print(f"\n项目规划: {project_name}")
-        print("=" * 50)
-        
-        # 分析需求
-        analysis = self._analyze_requirements(requirements)
-        
-        # 制定计划
-        plan = self._create_project_plan(project_name, analysis)
-        
-        # 分配资源
-        resources = self._allocate_resources(plan)
-        
-        # 估算时间
-        timeline = self._estimate_timeline(plan)
-        
-        self.project = {
-            "name": project_name,
-            "requirements": requirements,
-            "analysis": analysis,
-            "plan": plan,
-            "resources": resources,
-            "timeline": timeline
-        }
-        
-        return self.project
-    
-    def _analyze_requirements(self, requirements: List[str]) -> Dict:
-        """分析需求"""
-        return {
-            "total_requirements": len(requirements),
-            "complexity": "medium",
-            "priority": "high",
-            "dependencies": []
-        }
-    
-    def _create_project_plan(self, name: str, analysis: Dict) -> List[Dict]:
-        """创建项目计划"""
-        phases = [
-            {"phase": "需求分析", "tasks": ["收集需求", "分析需求", "确认需求"]},
-            {"phase": "设计", "tasks": ["架构设计", "详细设计", "设计评审"]},
-            {"phase": "开发", "tasks": ["编码", "单元测试", "代码审查"]},
-            {"phase": "测试", "tasks": ["集成测试", "系统测试", "用户验收"]},
-            {"phase": "部署", "tasks": ["部署准备", "生产部署", "监控"]},
+        lines = [
+            f"\n{'=' * 60}",
+            f"📊 执行总结",
+            f"{'=' * 60}",
+            f"  目标: {plan.goal}",
+            f"  完成: {completed}/{total} 任务",
+            f"  成功率: {completed/total*100:.0f}%" if total > 0 else "  成功率: N/A",
+            f"  最终状态: {'全部成功' if completed == total else '部分完成'}",
+            f"{'=' * 60}",
         ]
-        return phases
-    
-    def _allocate_resources(self, plan: List[Dict]) -> Dict:
-        """分配资源"""
-        return {
-            "developers": 3,
-            "testers": 1,
-            "designers": 1,
-            "budget": 100000
-        }
-    
-    def _estimate_timeline(self, plan: List[Dict]) -> List[Dict]:
-        """估算时间"""
-        timeline = []
-        current_week = 1
-        
-        for phase in plan:
-            duration = len(phase["tasks"]) * 2  # 每个任务2周
-            timeline.append({
-                "phase": phase["phase"],
-                "start_week": current_week,
-                "end_week": current_week + duration - 1,
-                "duration_weeks": duration
-            })
-            current_week += duration
-        
-        return timeline
+        return "\n".join(lines)
 
-# 使用示例
+
+# ====== 运行完整示例 ======
 if __name__ == "__main__":
-    planner = ProjectPlanner()
-    
-    project = planner.plan_project(
-        "Agent Factory 项目",
-        ["构建智能对话系统", "支持多轮对话", "集成外部工具"]
-    )
-    
-    print("\n项目计划:")
-    for phase in project["plan"]:
-        print(f"\n{phase['phase']}:")
-        for task in phase["tasks"]:
-            print(f"  - {task}")
-    
-    print("\n时间线:")
-    for item in project["timeline"]:
-        print(f"  {item['phase']}: 第{item['start_week']}-{item['end_week']}周")
+    # 1. 创建 Agent
+    agent = PlanAndSolveAgent(name="活动策划助手")
+
+    # 2. 注册自定义动作
+    agent.executor.register_action("确定预算", lambda t: "预算确定为50000元")
+    agent.executor.register_action("选择日期", lambda t: "日期定在12月28日")
+    agent.executor.register_action("预订场地", lambda t: "场地预订成功：国际会议中心A厅")
+    agent.executor.register_action("邀请嘉宾", lambda t: "已邀请20位嘉宾，确认出席15人")
+    agent.executor.register_action("安排餐饮", lambda t: "餐饮安排：自助餐，人均200元")
+
+    def布置现场_func(task):
+        """模拟布置现场失败"""
+        if task.retry_count == 0:
+            raise Exception("物料供应商临时涨价，需要更换供应商")
+        return "现场布置完成（使用备选供应商）"
+
+    agent.executor.register_action("布置现场", 布置现场_func)
+    agent.executor.register_action("活动执行", lambda t: "活动顺利举办，参与度95%")
+
+    # 3. 执行
+    result = agent.solve("策划公司年终总结活动", goal_type="event")
+
+    # 4. 输出总结
+    print(result["summary"])
+
+    # 5. 打印执行日志
+    print("\n📋 执行日志:")
+    for log in agent.executor.get_log():
+        print(f"  {log['task_name']}: {log['status']} -> {log['result']}")
 ```
+
+**预期输出：**
+```
+============================================================
+🤖 [活动策划助手] Plan-and-Solve Agent 启动
+🎯 目标: 策划公司年终总结活动
+============================================================
+
+📋 规划器开始工作
+  🎯 目标: 策划公司年终总结活动
+  📁 类型: event
+  📊 生成 7 个子任务
+  🔧 执行策略: sequential_with_checkpoints
+
+📝 执行计划:
+  目标: 策划公司年终总结活动
+  策略: sequential_with_checkpoints
+  任务列表:
+    ⏳ [task_1] 确定预算
+    ⏳ [task_2] 选择日期 <- ['task_1']
+    ...
+
+🚀 开始执行计划
+  📌 执行任务: 确定预算
+  ✅ 完成: 预算确定为50000元
+
+  📌 执行任务: 选择日期
+  ✅ 完成: 日期定在12月28日
+
+  ...
+
+  📌 执行任务: 布置现场
+  ⚠️ 失败 (重试 1/2): 物料供应商临时涨价，需要更换供应商
+  ✅ 完成: 现场布置完成（使用备选供应商）
+
+============================================================
+📊 执行总结
+============================================================
+  目标: 策划公司年终总结活动
+  完成: 7/7 任务
+  成功率: 100%
+  最终状态: 全部成功
+============================================================
+```
+
+---
 
 ## 🆘 急救包
+
 | # | 症状 | 解法 |
 |---|------|------|
-| 1 | 任务分解不合理 | 使用不同的分解策略 |
-| 2 | 依赖关系混乱 | 重新分析任务依赖 |
-| 3 | 执行效率低 | 考虑并行执行 |
-| 4 | 计划过于复杂 | 简化任务，分阶段执行 |
+| 1 | 任务永远 PENDING | 检查依赖是否形成了循环（A依赖B，B依赖A） |
+| 2 | 所有任务同时执行 | 确认 `_set_dependencies` 正确设置了线性依赖 |
+| 3 | 重规划后任务顺序错乱 | 重新规划只移除失败依赖，不改变原有的顺序逻辑 |
+| 4 | 默认执行无意义输出 | 用 `register_action` 为每个任务注册具体的执行函数 |
+| 5 | 不知道如何自定义任务模板 | 在 `decomposition_templates` 中添加新的目标类型 |
+| 6 | 任务失败后没有重试 | 检查 `max_retries` 设置，确保大于 0 |
+
+---
 
 ## 📖 概念对照表
+
 | 术语 | 一句话解释 |
 |------|-----------|
 | Plan-and-Solve | 先规划后执行的 Agent 范式 |
-| 任务分解 | 将复杂任务拆分为子任务 |
-| 依赖关系 | 任务之间的先后关系 |
-| 执行策略 | 任务的执行方式 |
-| 资源分配 | 分配人力、时间、预算 |
-| 时间线 | 任务的时间安排 |
+| Planner（规划器） | 将目标分解为子任务并确定依赖关系的组件 |
+| Executor（执行器） | 按计划执行任务并处理结果的组件 |
+| 任务分解 | 将复杂目标拆分为可管理的子任务 |
+| 依赖关系 | 任务之间的先后约束（B依赖A表示A必须先完成） |
+| 重规划（Re-planning） | 任务失败时动态调整计划 |
+| TaskStatus | 任务状态：pending/in_progress/completed/failed/skipped |
+| 执行策略 | 任务的执行方式（顺序/带检查点/迭代） |
+
+---
 
 ## ✅ 验收清单
-- [ ] 理解 Plan-and-Solve 的工作原理
-- [ ] 能设计任务分解策略
-- [ ] 能实现任务执行器
-- [ ] 能用 Plan-and-Solve 解决实际问题
+
+- [ ] 能解释 Plan-and-Solve 的完整工作流程
+- [ ] 能设计 Task 数据结构并设置依赖关系
+- [ ] 能运行"策划公司活动"示例，观察 7 个子任务的执行
+- [ ] 能解释重规划的工作机制
+- [ ] 能为新场景（如"学习Python"）创建自定义任务模板
+- [ ] 能在执行日志中追踪每个任务的状态变化
+- [ ] 能对比 Plan-and-Solve 与 ReAct 的区别和各自适用场景
+
+---
 
 ## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+- 今天最大的收获: ________________________________
+- 还不太确定的: ________________________________
+- Plan-and-Solve 最适合的场景是: ________________________________
+- 明天需要用到的基础: ________________________________
+
+---
 
 ## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+- 今日完成度: ____%
+- 卡点描述: ________________________________
+- 代码是否能跑通: ✅ 全部通过 / ⚠️ 部分通过 / ❌ 未通过
+- 明天希望: 学习 Reflection 范式如何让 Agent 自我评估和改进

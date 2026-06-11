@@ -1,41 +1,80 @@
-# 📅 Week 3 Day 7：复盘
+# Day 7: Week 3 复盘 + 学习效果评估
 
-## 🧭 今日方向
-> 今天是 Week 3 的最后一天，我们将对 LLM 基础学习进行全面复盘，总结经验教训，为 Week 4 的 Agent 范式学习做准备。
+## 今日学习目标
 
-## 🎯 生活比喻
-> 复盘就像厨师品尝自己的菜品，检查哪里做得好，哪里需要改进。只有不断复盘，才能不断进步。
-
-## 📋 今日三件事
 1. 回顾 Week 3 的学习内容
 2. 分析学习过程中的问题
-3. 制定 Week 4 的学习计划
+3. 评估知识点掌握度
+4. 制定 Week 4 的学习计划
+5. 总结学习方法和经验
 
-## 🗺️ 手把手路线
+---
 
-### Step 1: 内容回顾
-- **做什么**: 系统回顾 Week 3 的所有知识点
-- **为什么**: 巩固学习内容，发现遗漏
-- **成功标志**: 能清晰地讲述每个知识点
+## 第一部分：Week 3 内容回顾
 
-### Step 2: 问题分析
-- **做什么**: 分析学习过程中遇到的问题
-- **为什么**: 找出问题才能改进
-- **成功标志**: 能总结出改进方法
+### 学习主题
 
-### Step 3: 计划制定
-- **做什么**: 制定 Week 4 的学习计划
-- **为什么**: 明确目标才能高效学习
-- **成功标志**: 有可执行的学习计划
+```
+Week 3 学习内容：
+    
+Day 1: NLP 基础 + 文本表示演进
+    - NLP 基本概念
+    - 文本预处理
+    - One-Hot, TF-IDF, Word2Vec
+    - Embedding 原理
+    
+Day 2: Transformer 架构 + 自注意力机制
+    - Transformer 整体架构
+    - 自注意力机制 (Q, K, V)
+    - 位置编码
+    - 多头注意力
+    
+Day 3: 大模型概览 - GPT/Claude/LLaMA 对比
+    - 主流大模型发展史
+    - 模型架构对比
+    - 开源 vs 闭源
+    - 模型选择指南
+    
+Day 4: 提示工程 - Few-shot / CoT / 结构化输出
+    - 提示工程基础
+    - Few-shot 学习
+    - Chain-of-Thought
+    - 结构化输出
+    
+Day 5: "When NOT to build agents" 判断框架
+    - Agent 适用性分析
+    - 决策框架
+    - 替代方案
+    - 案例分析
+    
+Day 6: LLM API 工程实践 - 流式调用 + Token 管理
+    - 流式调用实现
+    - Token 计数和管理
+    - 成本优化策略
+    - 缓存机制
+    
+Day 7: 复盘
+    - 内容回顾
+    - 问题分析
+    - 学习效果评估
+    - Week 4 计划
+```
 
-## 💻 代码区
+---
+
+## 第二部分：复盘脚本
+
+### 文件：app/review/week3_review.py
 
 ```python
-# Week 3 复盘脚本
+"""
+Week 3 复盘脚本
+"""
 
 from datetime import datetime
 from typing import Dict, List, Any
 from dataclasses import dataclass, field
+
 
 @dataclass
 class KnowledgePoint:
@@ -44,6 +83,7 @@ class KnowledgePoint:
     mastered: bool
     confidence: int  # 1-5
     notes: str = ""
+
 
 @dataclass
 class DailyRecord:
@@ -55,6 +95,7 @@ class DailyRecord:
     challenges: List[str]
     knowledge_points: List[KnowledgePoint]
     rating: int  # 1-5
+
 
 class Week3Review:
     """Week 3 复盘类"""
@@ -101,7 +142,7 @@ class Week3Review:
         report = f"""# Week 3 复盘报告
 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-## 📊 学习统计
+## 学习统计
 
 ### 总体进度
 - 完成天数: {sum(1 for r in self.records if r.completed)}/{len(self.records)}
@@ -114,26 +155,26 @@ class Week3Review:
 - 掌握率: {mastery.get('mastery_rate', 0):.1f}%
 - 平均置信度: {mastery.get('average_confidence', 0):.1f}/5
 
-## 🎯 学习目标完成情况
+## 学习目标完成情况
 
 """
         
         for i, goal in enumerate(self.goals, 1):
             if i <= len(self.records):
                 record = self.records[i-1]
-                status = "✅" if record.completed else "❌"
-                rating = "⭐" * record.rating
-                report += f"{i}. {status} {goal} {rating}\n"
+                status = "完成" if record.completed else "未完成"
+                rating = "★" * record.rating + "☆" * (5 - record.rating)
+                report += f"{i}. [{status}] {goal} {rating}\n"
             else:
-                report += f"{i}. ❌ {goal}\n"
+                report += f"{i}. [未完成] {goal}\n"
         
-        report += "\n## 📅 每日学习记录\n\n"
+        report += "\n## 每日学习记录\n\n"
         
         for record in self.records:
-            status = "✅" if record.completed else "❌"
+            status = "完成" if record.completed else "未完成"
             report += f"### Day {record.day}: {record.topic}\n"
             report += f"- 状态: {status}\n"
-            report += f"- 评分: {'⭐' * record.rating}/5\n"
+            report += f"- 评分: {'★' * record.rating}/5\n"
             
             report += "- 主要收获:\n"
             for learning in record.key_learnings:
@@ -150,7 +191,7 @@ class Week3Review:
             
             report += "\n"
         
-        report += f"""## 🔍 深度分析
+        report += f"""## 深度分析
 
 ### 学习曲线分析
 """
@@ -197,37 +238,61 @@ class Week3Review:
         report += "\n"
         
         report += """
-## 💡 经验总结
+## 技术收获
 
-### 技术收获
-1. **NLP 基础**: 文本表示方法的演进，从 One-Hot 到 Embedding
-2. **Transformer**: 自注意力机制是现代大模型的核心
-3. **大模型对比**: 不同模型有不同的特点和适用场景
-4. **提示工程**: 好的提示能显著提高模型表现
-5. **API 工程**: 流式调用和 Token 管理是实践关键
+### NLP 基础
+- 文本表示方法的演进：One-Hot → TF-IDF → Word2Vec → Embedding
+- Embedding 是现代 NLP 的核心，将离散对象映射为连续向量
 
-### 学习方法
+### Transformer 架构
+- 自注意力机制是现代大模型的核心创新
+- Q, K, V 的概念和计算过程
+- 位置编码解决序列顺序问题
+
+### 大模型对比
+- GPT: OpenAI 的生成式模型系列
+- Claude: Anthropic 的安全可靠模型
+- LLaMA: Meta 的开源模型
+- 根据场景选择合适的模型
+
+### 提示工程
+- Few-shot: 通过示例引导模型
+- CoT: 让模型展示推理过程
+- 结构化输出: 指定输出格式
+
+### Agent 判断框架
+- 不是所有任务都需要 Agent
+- 使用决策框架评估任务复杂度
+- 了解替代方案：脚本、规则引擎等
+
+### LLM API 工程
+- 流式调用提高用户体验
+- Token 管理控制成本
+- 缓存机制减少重复调用
+
+## 学习方法总结
+
+### 有效的方法
 1. **概念先行**: 先理解原理，再看代码实现
 2. **动手实践**: 每个概念都要有代码演示
 3. **对比学习**: 通过对比加深理解
 4. **问题驱动**: 带着问题学习更高效
 
-### 改进点
+### 需要改进
 1. **时间管理**: 合理分配每天的学习时间
 2. **笔记整理**: 及时整理和复习笔记
 3. **代码实践**: 增加动手实践的时间
 4. **交流讨论**: 多与他人讨论，加深理解
 
-## 🚀 下周计划
+## Week 4 计划
 
-### Week 4: Agent 范式
-- 智能体定义、类型、发展史
-- ReAct 范式：推理 + 行动交替
+### 学习主题
+- Agent 范式
+- ReAct 范式
 - Plan-and-Solve 范式
-- Reflection 范式：自我反思
-- Metacognition 范式：元认知
+- Reflection 范式
+- Metacognition 范式
 - 五种 Agent 工作流模式
-- 复盘
 
 ### 学习重点
 1. **理解范式**: 掌握不同 Agent 范式的原理
@@ -243,6 +308,7 @@ class Week3Review:
 """
         
         return report
+
 
 def create_week3_review():
     """创建 Week 3 复盘数据"""
@@ -386,6 +452,7 @@ def create_week3_review():
     
     return review
 
+
 if __name__ == "__main__":
     # 创建复盘数据
     review = create_week3_review()
@@ -393,50 +460,69 @@ if __name__ == "__main__":
     # 生成报告
     report = review.generate_report()
     
+    # 打印报告
+    print(report)
+    
     # 保存报告
     with open("week3_review.md", "w", encoding="utf-8") as f:
         f.write(report)
     
-    print("✅ Week 3 复盘报告已生成")
-    print("\n报告预览:")
-    print(report[:1000] + "...")
+    print("\n复盘报告已保存到 week3_review.md")
 ```
 
+---
+
+## 第三部分：学习效果评估
+
+### 文件：app/review/assessment.py
+
 ```python
-# 学习效果评估
+"""
+学习效果评估
+"""
 
 from typing import Dict, List
+from dataclasses import dataclass
+
+
+@dataclass
+class AssessmentItem:
+    """评估项"""
+    topic: str
+    score: int  # 1-5
+    notes: str = ""
+
 
 class LearningAssessment:
     """学习效果评估"""
     
     def __init__(self):
-        self.assessments = {}
+        self.assessments: Dict[str, AssessmentItem] = {}
     
     def add_assessment(self, topic: str, score: int, notes: str = ""):
         """添加评估"""
-        self.assessments[topic] = {"score": score, "notes": notes}
+        self.assessments[topic] = AssessmentItem(topic=topic, score=score, notes=notes)
     
     def get_average_score(self) -> float:
         """获取平均分"""
         if not self.assessments:
             return 0.0
         
-        total = sum(a["score"] for a in self.assessments.values())
+        total = sum(item.score for item in self.assessments.values())
         return total / len(self.assessments)
     
     def get_weak_areas(self, threshold: int = 3) -> List[str]:
         """获取薄弱领域"""
         return [
-            topic for topic, assessment in self.assessments.items()
-            if assessment["score"] < threshold
+            item.topic for item in self.assessments.values()
+            if item.score < threshold
         ]
     
     def get_strong_areas(self, threshold: int = 4) -> List[str]:
         """获取优势领域"""
         return [
-            topic for topic, assessment in self.assessments.items()
-            if assessment["score"] >= threshold
+            item.topic for item in self.assessments.values()
+            if item.score >= threshold
         ]
     
     def generate_assessment_report(self) -> str:
@@ -449,13 +535,13 @@ class LearningAssessment:
         # 按分数排序
         sorted_assessments = sorted(
             self.assessments.items(),
-            key=lambda x: x[1]["score"],
+            key=lambda x: x[1].score,
             reverse=True
         )
         
-        for topic, assessment in sorted_assessments:
-            score = assessment["score"]
-            notes = assessment["notes"]
+        for topic, item in sorted_assessments:
+            score = item.score
+            notes = item.notes
             report += f"{topic}: {score}/5"
             if notes:
                 report += f" ({notes})"
@@ -473,53 +559,322 @@ class LearningAssessment:
         
         return report
 
-# 使用示例
-if __name__ == "__main__":
+
+def create_week3_assessment():
+    """创建 Week 3 评估"""
     assessment = LearningAssessment()
     
     # 添加评估
     assessment.add_assessment("NLP 基础", 4, "掌握良好")
-    assessment.add_assessment("Transformer", 3, "需要复习注意力机制")
-    assessment.add_assessment("大模型对比", 4, "理解清晰")
+    assessment.add_assessment("文本表示方法", 4, "理解清晰")
+    assessment.add_assessment("Transformer 架构", 3, "需要复习注意力机制")
+    assessment.add_assessment("自注意力机制", 3, "数学原理需要加强")
+    assessment.add_assessment("大模型对比", 4, "理解到位")
     assessment.add_assessment("提示工程", 5, "掌握扎实")
+    assessment.add_assessment("Few-shot 学习", 4, "实践充分")
+    assessment.add_assessment("Chain-of-Thought", 4, "能应用")
     assessment.add_assessment("Agent 判断框架", 4, "理解到位")
-    assessment.add_assessment("API 工程", 4, "实践充分")
+    assessment.add_assessment("LLM API 工程", 4, "实践充分")
+    assessment.add_assessment("流式调用", 4, "能实现")
+    assessment.add_assessment("Token 管理", 4, "理解清晰")
+    assessment.add_assessment("成本优化", 4, "掌握策略")
+    
+    return assessment
+
+
+if __name__ == "__main__":
+    assessment = create_week3_assessment()
     
     # 生成报告
     report = assessment.generate_assessment_report()
     print(report)
+    
+    # 保存报告
+    with open("week3_assessment.md", "w", encoding="utf-8") as f:
+        f.write(report)
+    
+    print("\n评估报告已保存到 week3_assessment.md")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 复盘内容空洞 | 结合具体代码示例，记录真实过程 |
-| 2 | 不知道如何改进 | 分析失败原因，制定具体行动计划 |
-| 3 | 时间不够用 | 优先复盘核心内容，次要内容快速回顾 |
-| 4 | 缺乏动力 | 回顾学习成果，设定小目标激励自己 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| 复盘 | 回顾总结，找出成功经验和改进点 |
-| 学习效果评估 | 评估学习成果的方法 |
-| 知识点掌握度 | 对知识点的理解程度 |
-| 学习曲线 | 学习进度随时间的变化 |
-| 薄弱领域 | 需要加强的知识领域 |
-| 优势领域 | 掌握较好的知识领域 |
+## 第四部分：Week 4 计划
 
-## ✅ 验收清单
+### 文件：app/review/week4_plan.py
+
+```python
+"""
+Week 4 学习计划
+"""
+
+from datetime import datetime, timedelta
+from dataclasses import dataclass
+from typing import List
+
+
+@dataclass
+class DailyPlan:
+    """每日计划"""
+    day: int
+    date: str
+    topic: str
+    objectives: List[str]
+    resources: List[str]
+    expected_output: str
+
+
+class Week4Plan:
+    """Week 4 计划"""
+    
+    def __init__(self, start_date: str = "2024-01-22"):
+        self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        self.plans: List[DailyPlan] = []
+    
+    def generate_plans(self):
+        """生成每日计划"""
+        topics = [
+            {
+                "topic": "Agent 范式：定义、类型、发展史",
+                "objectives": [
+                    "理解 Agent 的定义和核心概念",
+                    "了解 Agent 的主要类型",
+                    "掌握 Agent 的发展历程"
+                ],
+                "resources": [
+                    "《ReAct: Synergizing Reasoning and Acting》",
+                    "Lilian Weng 的 Agent 博客"
+                ],
+                "expected_output": "能解释 Agent 的定义和类型"
+            },
+            {
+                "topic": "ReAct 范式：推理 + 行动交替",
+                "objectives": [
+                    "理解 ReAct 的核心思想",
+                    "实现简单的 ReAct Agent",
+                    "分析 ReAct 的优缺点"
+                ],
+                "resources": [
+                    "ReAct 原论文",
+                    "LangChain ReAct 实现"
+                ],
+                "expected_output": "能实现 ReAct Agent"
+            },
+            {
+                "topic": "Plan-and-Solve 范式",
+                "objectives": [
+                    "理解 Plan-and-Solve 的原理",
+                    "对比 ReAct 和 Plan-and-Solve",
+                    "实现简单的 Plan-and-Solve Agent"
+                ],
+                "resources": [
+                    "Plan-and-Solve 原论文",
+                    "相关实现代码"
+                ],
+                "expected_output": "能实现 Plan-and-Solve Agent"
+            },
+            {
+                "topic": "Reflection 范式：自我反思",
+                "objectives": [
+                    "理解 Reflection 的原理",
+                    "实现自我反思机制",
+                    "分析 Reflection 的应用场景"
+                ],
+                "resources": [
+                    "Reflexion 论文",
+                    "自我反思实现示例"
+                ],
+                "expected_output": "能实现 Reflection Agent"
+            },
+            {
+                "topic": "Metacognition 范式：元认知",
+                "objectives": [
+                    "理解元认知的概念",
+                    "实现元认知监控",
+                    "分析元认知在 Agent 中的应用"
+                ],
+                "resources": [
+                    "元认知相关论文",
+                    "实现示例"
+                ],
+                "expected_output": "能解释元认知在 Agent 中的作用"
+            },
+            {
+                "topic": "五种 Agent 工作流模式",
+                "objectives": [
+                    "掌握五种工作流模式",
+                    "对比不同模式的优劣",
+                    "选择合适的模式"
+                ],
+                "resources": [
+                    "Anthropic 的 Agent 设计指南",
+                    "工作流模式示例"
+                ],
+                "expected_output": "能根据场景选择工作流模式"
+            },
+            {
+                "topic": "Week 4 复盘",
+                "objectives": [
+                    "回顾 Week 4 学习内容",
+                    "分析学习过程中的问题",
+                    "制定 Week 5 计划"
+                ],
+                "resources": [
+                    "复盘模板",
+                    "学习效果评估"
+                ],
+                "expected_output": "完成 Week 4 复盘报告"
+            }
+        ]
+        
+        for i, topic_info in enumerate(topics):
+            plan_date = self.start_date + timedelta(days=i)
+            
+            plan = DailyPlan(
+                day=i + 1,
+                date=plan_date.strftime("%Y-%m-%d"),
+                topic=topic_info["topic"],
+                objectives=topic_info["objectives"],
+                resources=topic_info["resources"],
+                expected_output=topic_info["expected_output"]
+            )
+            
+            self.plans.append(plan)
+    
+    def generate_plan_report(self) -> str:
+        """生成计划报告"""
+        report = f"""# Week 4 学习计划
+开始日期: {self.start_date.strftime('%Y-%m-%d')}
+
+## 学习目标
+
+1. 掌握 Agent 的核心范式
+2. 理解不同范式的原理和应用场景
+3. 能实现简单的 Agent
+4. 为 Agent Factory 项目打下基础
+
+## 每日计划
+
+"""
+        
+        for plan in self.plans:
+            report += f"""### Day {plan.day} ({plan.date})
+**主题**: {plan.topic}
+
+**学习目标**:
+"""
+            for obj in plan.objectives:
+                report += f"- {obj}\n"
+            
+            report += "\n**学习资源**:\n"
+            for resource in plan.resources:
+                report += f"- {resource}\n"
+            
+            report += f"\n**预期输出**: {plan.expected_output}\n\n"
+        
+        report += """## 学习策略
+
+1. **预习**: 提前阅读相关资料
+2. **专注**: 每天集中精力学习一个主题
+3. **实践**: 每个范式都要有代码实现
+4. **总结**: 每天写学习笔记
+5. **复盘**: 每周进行复盘总结
+
+## 注意事项
+
+1. 保持学习节奏，不要急于求成
+2. 注重理解原理，不要只看代码
+3. 多动手实践，加深理解
+4. 遇到问题及时记录和解决
+5. 保持学习笔记的更新
+"""
+        
+        return report
+
+
+if __name__ == "__main__":
+    # 创建计划
+    plan = Week4Plan("2024-01-22")
+    plan.generate_plans()
+    
+    # 生成报告
+    report = plan.generate_plan_report()
+    
+    # 打印报告
+    print(report)
+    
+    # 保存报告
+    with open("week4_plan.md", "w", encoding="utf-8") as f:
+        f.write(report)
+    
+    print("\n学习计划已保存到 week4_plan.md")
+```
+
+---
+
+## 验证清单
+
+完成今日学习后，检查以下项目：
+
 - [ ] 完成 Week 3 学习内容回顾
-- [ ] 分析学习过程中的问题
-- [ ] 制定 Week 4 学习计划
-- [ ] 生成完整的复盘报告
+- [ ] 分析了学习过程中的问题
+- [ ] 完成了学习效果评估
+- [ ] 制定了 Week 4 学习计划
+- [ ] 生成了完整的复盘报告
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+---
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+## Week 3 总结
+
+### 技术栈
+
+- **NLP**: 自然语言处理基础
+- **Transformer**: 自注意力机制
+- **LLM**: 大语言模型
+- **提示工程**: 提示设计技巧
+- **LLM API**: 流式调用、Token 管理
+
+### 核心概念
+
+1. **文本表示**: One-Hot → TF-IDF → Word2Vec → Embedding
+2. **自注意力**: Q, K, V 计算，多头注意力
+3. **大模型**: GPT, Claude, LLaMA 的特点和选择
+4. **提示工程**: Few-shot, CoT, 结构化输出
+5. **Agent 判断**: 何时使用 Agent，替代方案
+6. **API 工程**: 流式调用，Token 管理，成本优化
+
+### 学习成果
+
+- 理解了 NLP 基础概念
+- 掌握了 Transformer 架构
+- 了解了主流大模型
+- 学会了提示工程技巧
+- 建立了 Agent 判断框架
+- 掌握了 LLM API 工程
+
+---
+
+## Week 4 预告
+
+### 学习主题
+
+- Agent 范式
+- ReAct 范式
+- Plan-and-Solve 范式
+- Reflection 范式
+- Metacognition 范式
+- 五种 Agent 工作流模式
+
+### 学习目标
+
+1. 理解 Agent 的核心范式
+2. 掌握不同范式的原理
+3. 能实现简单的 Agent
+4. 为 Agent Factory 项目做准备
+
+---
+
+## 参考资源
+
+- [Agent 综述论文](https://arxiv.org/abs/2308.11432)
+- [ReAct 论文](https://arxiv.org/abs/2210.03629)
+- [Anthropic Agent 设计指南](https://www.anthropic.com/research/building-effective-agents)

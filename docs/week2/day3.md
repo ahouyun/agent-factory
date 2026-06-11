@@ -1,124 +1,193 @@
-# 📅 Week 2 Day 3：数据库 ORM（SQLAlchemy 2.0）+ CRUD
+# Day 3: 数据库 ORM（SQLAlchemy 2.0）+ CRUD
 
-## 🧭 今日方向
-> 今天我们将学习 SQLAlchemy 2.0 ORM，掌握数据库操作的现代化方法，并实现完整的 CRUD 操作。
+## 今日学习目标
 
-## 🎯 生活比喻
-> SQLAlchemy 就像一个智能仓库管理系统：ORM 是仓库的布局图，数据库是仓库本身，CRUD 就是入库、查询、更新、出库操作。
+1. 理解 ORM 的概念和优势
+2. 安装和配置 SQLAlchemy 2.0
+3. 定义数据库模型和关系
+4. 实现完整的数据库 CRUD 操作
+5. 集成 FastAPI 和 SQLAlchemy
 
-## 📋 今日三件事
-1. 搭建 SQLAlchemy 2.0 环境
-2. 定义数据模型和关系
-3. 实现完整的 CRUD 操作
+---
 
-## 🗺️ 手把手路线
+## 第一部分：ORM 基础概念
 
-### Step 1: SQLAlchemy 基础
-- **做什么**: 安装 SQLAlchemy 并配置数据库连接
-- **为什么**: SQLAlchemy 是 Python 最流行的 ORM
-- **成功标志**: 能连接数据库并创建表
+### 什么是 ORM？
 
-### Step 2: 数据模型定义
-- **做什么**: 使用 SQLAlchemy 2.0 的新语法定义模型
-- **为什么**: 清晰的模型是数据库操作的基础
-- **成功标志**: 能定义复杂的数据模型和关系
+**类比理解：**
+ORM（对象关系映射）就像翻译官：
+- 你用 Python 对象说话（`User` 类）
+- 翻译官把它翻译成 SQL 语句（`INSERT INTO users...`）
+- 数据库执行 SQL 语句
+- 翻译官把结果翻译回 Python 对象
 
-### Step 3: CRUD 操作
-- **做什么**: 实现创建、读取、更新、删除操作
-- **为什么**: CRUD 是数据库操作的核心
-- **成功标志**: 能完成各种数据库操作
-
-## 💻 代码区
+### ORM vs 原生 SQL
 
 ```python
-# SQLAlchemy 2.0 基础配置
+# 原生 SQL
+"""
+INSERT INTO users (username, email, password_hash) 
+VALUES ('john', 'john@example.com', 'hashed_password');
+"""
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, relationship, DeclarativeBase
-from datetime import datetime
-from typing import Optional, List
-from contextlib import asynccontextmanager
+# SQLAlchemy ORM
+"""
+user = User(username="john", email="john@example.com", password_hash="hashed_password")
+db.add(user)
+db.commit()
+"""
+```
 
-# 数据库配置
-DATABASE_URL = "sqlite:///./agent_factory.db"
-ASYNC_DATABASE_URL = "sqlite+aiosqlite:///./agent_factory.db"
+### SQLAlchemy 2.0 新特性
 
-# 创建引擎
-engine = create_engine(DATABASE_URL, echo=True)
-async_engine = create_async_engine(ASYNC_DATABASE_URL, echo=True)
+| 特性 | 1.x | 2.0 |
+|------|-----|-----|
+| 模型定义 | `declarative_base()` | `DeclarativeBase` 类 |
+| 查询语法 | `session.query()` | `select()` 语句 |
+| 异步支持 | 需要扩展 | 原生支持 |
+| 类型注解 | 有限 | 完整支持 |
 
-# 创建会话工厂
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-AsyncSessionLocal = sessionmaker(
+---
+
+## 第二部分：环境配置
+
+### 安装依赖
+
+```bash
+# 安装 SQLAlchemy 和相关依赖
+pip install sqlalchemy aiosqlite
+
+# 验证安装
+pip list | grep -i sqlalchemy
+```
+
+**预期输出：**
+```
+SQLAlchemy              2.0.23
+aiosqlite               0.19.0
+```
+
+### 项目结构
+
+```
+agent-factory-api/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── database.py        # 数据库配置
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── user.py        # 用户模型
+│   │   └── task.py        # 任务模型
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── user.py        # 用户 Pydantic 模型
+│   │   └── task.py        # 任务 Pydantic 模型
+│   └── crud/
+│       ├── __init__.py
+│       ├── user.py        # 用户 CRUD 操作
+│       └── task.py        # 任务 CRUD 操作
+└── requirements.txt
+```
+
+---
+
+## 第三部分：数据库配置
+
+### 文件：app/database.py
+
+```python
+"""
+数据库配置和会话管理
+"""
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from typing import Generator
+import os
+
+# ==================== 数据库 URL ====================
+
+# 同步数据库 URL（用于开发和测试）
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./agent_factory.db"
+)
+
+# 异步数据库 URL（用于生产环境）
+ASYNC_DATABASE_URL = os.getenv(
+    "ASYNC_DATABASE_URL",
+    "sqlite+aiosqlite:///./agent_factory.db"
+)
+
+# ==================== 引擎创建 ====================
+
+# 同步引擎
+engine = create_engine(
+    DATABASE_URL,
+    echo=True,  # 打印 SQL 语句（开发环境）
+    connect_args={"check_same_thread": False}  # SQLite 特有参数
+)
+
+# 异步引擎
+async_engine = create_async_engine(
+    ASYNC_DATABASE_URL,
+    echo=True,
+    connect_args={"check_same_thread": False}
+)
+
+# ==================== 会话工厂 ====================
+
+# 同步会话工厂
+SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
-    bind=async_engine,
+    bind=engine
+)
+
+# 异步会话工厂
+AsyncSessionLocal = async_sessionmaker(
+    async_engine,
     class_=AsyncSession,
     expire_on_commit=False
 )
 
-# 基础模型类
+
+# ==================== 基础模型 ====================
+
 class Base(DeclarativeBase):
-    """SQLAlchemy 2.0 基础模型"""
+    """SQLAlchemy 2.0 基础模型类"""
     pass
 
-# 数据模型
-class User(Base):
-    """用户模型"""
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(200), nullable=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # 关系
-    tasks = relationship("Task", back_populates="owner")
-    
-    def __repr__(self):
-        return f"<User(id={self.id}, username='{self.username}')>"
 
-class Task(Base):
-    """任务模型"""
-    __tablename__ = "tasks"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(100), nullable=False)
-    description = Column(String(500))
-    status = Column(String(20), default="pending")
-    priority = Column(Integer, default=2)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # 外键
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    owner = relationship("User", back_populates="tasks")
-    
-    def __repr__(self):
-        return f"<Task(id={self.id}, title='{self.title}')>"
+# ==================== 会话依赖 ====================
 
-# 创建数据库表
-def create_tables():
-    """创建数据库表"""
-    Base.metadata.create_all(bind=engine)
-    print("✅ 数据库表创建完成")
-
-# 获取数据库会话
-def get_db():
-    """获取数据库会话（同步）"""
+def get_db() -> Generator[SessionLocal, None, None]:
+    """
+    获取数据库会话（用于 FastAPI 依赖注入）
+    
+    使用方式：
+    @app.get("/users/")
+    def get_users(db: Session = Depends(get_db)):
+        ...
+    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-@asynccontextmanager
-async def get_async_db():
-    """获取数据库会话（异步）"""
+
+async def get_async_db() -> AsyncSession:
+    """
+    获取异步数据库会话
+    
+    使用方式：
+    @app.get("/users/")
+    async def get_users(db: AsyncSession = Depends(get_async_db)):
+        ...
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -129,417 +198,1091 @@ async def get_async_db():
         finally:
             await session.close()
 
-if __name__ == "__main__":
-    # 创建数据库表
-    create_tables()
-    print("数据库配置完成")
+
+# ==================== 数据库初始化 ====================
+
+def init_db():
+    """初始化数据库（创建所有表）"""
+    Base.metadata.create_all(bind=engine)
+    print("数据库表创建完成")
+
+
+def drop_db():
+    """删除所有表（危险操作！）"""
+    Base.metadata.drop_all(bind=engine)
+    print("数据库表已删除")
 ```
 
+---
+
+## 第四部分：定义数据库模型
+
+### 文件：app/models/user.py
+
 ```python
-# 完整的 CRUD 操作
+"""
+用户数据库模型
+"""
+
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from app.database import Base
+
+
+class User(Base):
+    """用户模型"""
+    __tablename__ = "users"
+    
+    # 主键
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # 基本信息
+    username = Column(
+        String(50), 
+        unique=True, 
+        index=True, 
+        nullable=False,
+        comment="用户名"
+    )
+    email = Column(
+        String(100), 
+        unique=True, 
+        index=True, 
+        nullable=False,
+        comment="邮箱地址"
+    )
+    full_name = Column(
+        String(100), 
+        nullable=True,
+        comment="全名"
+    )
+    
+    # 安全信息
+    password_hash = Column(
+        String(200), 
+        nullable=False,
+        comment="密码哈希"
+    )
+    
+    # 状态信息
+    is_active = Column(
+        Boolean, 
+        default=True,
+        comment="是否激活"
+    )
+    is_superuser = Column(
+        Boolean, 
+        default=False,
+        comment="是否超级管理员"
+    )
+    
+    # 时间戳
+    created_at = Column(
+        DateTime, 
+        default=datetime.utcnow,
+        comment="创建时间"
+    )
+    updated_at = Column(
+        DateTime, 
+        default=datetime.utcnow, 
+        onupdate=datetime.utcnow,
+        comment="更新时间"
+    )
+    last_login = Column(
+        DateTime, 
+        nullable=True,
+        comment="最后登录时间"
+    )
+    
+    # 关系
+    tasks = relationship("Task", back_populates="owner", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<User(id={self.id}, username='{self.username}')>"
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "full_name": self.full_name,
+            "is_active": self.is_active,
+            "is_superuser": self.is_superuser,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None
+        }
+```
+
+### 文件：app/models/task.py
+
+```python
+"""
+任务数据库模型
+"""
+
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from app.database import Base
+import enum
+
+
+class TaskStatus(str, enum.Enum):
+    """任务状态枚举"""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class TaskPriority(str, enum.Enum):
+    """任务优先级枚举"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class Task(Base):
+    """任务模型"""
+    __tablename__ = "tasks"
+    
+    # 主键
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # 基本信息
+    title = Column(
+        String(200), 
+        nullable=False,
+        comment="任务标题"
+    )
+    description = Column(
+        Text, 
+        nullable=True,
+        comment="任务描述"
+    )
+    
+    # 状态和优先级
+    status = Column(
+        String(20), 
+        default=TaskStatus.PENDING.value,
+        comment="任务状态"
+    )
+    priority = Column(
+        String(20), 
+        default=TaskPriority.MEDIUM.value,
+        comment="任务优先级"
+    )
+    
+    # 标签（JSON 字符串存储）
+    tags = Column(
+        Text, 
+        nullable=True,
+        comment="标签（JSON 格式）"
+    )
+    
+    # 时间信息
+    due_date = Column(
+        DateTime, 
+        nullable=True,
+        comment="截止日期"
+    )
+    completed_at = Column(
+        DateTime, 
+        nullable=True,
+        comment="完成时间"
+    )
+    
+    # 时间戳
+    created_at = Column(
+        DateTime, 
+        default=datetime.utcnow,
+        comment="创建时间"
+    )
+    updated_at = Column(
+        DateTime, 
+        default=datetime.utcnow, 
+        onupdate=datetime.utcnow,
+        comment="更新时间"
+    )
+    
+    # 外键
+    owner_id = Column(
+        Integer, 
+        nullable=False,
+        comment="所有者ID"
+    )
+    
+    # 关系
+    owner = relationship("User", back_populates="tasks")
+    
+    def __repr__(self):
+        return f"<Task(id={self.id}, title='{self.title}', status='{self.status}')>"
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "status": self.status,
+            "priority": self.priority,
+            "owner_id": self.owner_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None
+        }
+```
+
+### 文件：app/models/__init__.py
+
+```python
+"""
+模型包初始化
+"""
+
+from app.models.user import User
+from app.models.task import Task, TaskStatus, TaskPriority
+
+__all__ = ["User", "Task", "TaskStatus", "TaskPriority"]
+```
+
+---
+
+## 第五部分：Pydantic 模型（请求/响应）
+
+### 文件：app/schemas/user.py
+
+```python
+"""
+用户 Pydantic 模型
+"""
+
+from pydantic import BaseModel, Field, EmailStr, field_validator
+from typing import Optional
+from datetime import datetime
+
+
+class UserBase(BaseModel):
+    """用户基础字段"""
+    username: str = Field(
+        ..., 
+        min_length=3, 
+        max_length=50,
+        description="用户名",
+        examples=["john_doe"]
+    )
+    email: str = Field(
+        ..., 
+        description="邮箱地址",
+        examples=["john@example.com"]
+    )
+    full_name: Optional[str] = Field(
+        None, 
+        max_length=100,
+        description="全名"
+    )
+
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        """验证用户名格式"""
+        if not v.isalnum() and '_' not in v:
+            raise ValueError('用户名只能包含字母、数字和下划线')
+        return v.lower()
+
+
+class UserCreate(UserBase):
+    """创建用户请求"""
+    password: str = Field(
+        ..., 
+        min_length=8,
+        description="密码",
+        examples=["securepassword123"]
+    )
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """验证密码强度"""
+        if not any(c.isupper() for c in v):
+            raise ValueError('密码必须包含至少一个大写字母')
+        if not any(c.islower() for c in v):
+            raise ValueError('密码必须包含至少一个小写字母')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('密码必须包含至少一个数字')
+        return v
+
+
+class UserUpdate(BaseModel):
+    """更新用户请求"""
+    email: Optional[str] = Field(None, description="邮箱地址")
+    full_name: Optional[str] = Field(None, max_length=100, description="全名")
+    password: Optional[str] = Field(None, min_length=8, description="新密码")
+
+
+class UserResponse(UserBase):
+    """用户响应"""
+    id: int = Field(..., description="用户ID")
+    is_active: bool = Field(..., description="是否激活")
+    is_superuser: bool = Field(..., description="是否超级管理员")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+    last_login: Optional[datetime] = Field(None, description="最后登录时间")
+
+    class Config:
+        from_attributes = True
+
+
+class UserLogin(BaseModel):
+    """用户登录请求"""
+    username: str = Field(..., description="用户名")
+    password: str = Field(..., description="密码")
+
+
+class UserListResponse(BaseModel):
+    """用户列表响应"""
+    users: list[UserResponse]
+    total: int
+    page: int
+    page_size: int
+```
+
+### 文件：app/schemas/task.py
+
+```python
+"""
+任务 Pydantic 模型
+"""
+
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
+
+
+class TaskStatusEnum(str, Enum):
+    """任务状态枚举"""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class TaskPriorityEnum(str, Enum):
+    """任务优先级枚举"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class TaskCreate(BaseModel):
+    """创建任务请求"""
+    title: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=200,
+        description="任务标题",
+        examples=["学习 FastAPI"]
+    )
+    description: Optional[str] = Field(
+        None, 
+        max_length=1000,
+        description="任务描述"
+    )
+    priority: TaskPriorityEnum = Field(
+        default=TaskPriorityEnum.MEDIUM,
+        description="任务优先级"
+    )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="任务标签"
+    )
+
+
+class TaskUpdate(BaseModel):
+    """更新任务请求"""
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=1000)
+    status: Optional[TaskStatusEnum] = None
+    priority: Optional[TaskPriorityEnum] = None
+    tags: Optional[List[str]] = None
+
+
+class TaskResponse(BaseModel):
+    """任务响应"""
+    id: int = Field(..., description="任务ID")
+    title: str = Field(..., description="任务标题")
+    description: Optional[str] = Field(None, description="任务描述")
+    status: TaskStatusEnum = Field(..., description="任务状态")
+    priority: TaskPriorityEnum = Field(..., description="任务优先级")
+    owner_id: int = Field(..., description="所有者ID")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+    completed_at: Optional[datetime] = Field(None, description="完成时间")
+
+    class Config:
+        from_attributes = True
+
+
+class TaskListResponse(BaseModel):
+    """任务列表响应"""
+    tasks: list[TaskResponse]
+    total: int
+    page: int
+    page_size: int
+```
+
+---
+
+## 第六部分：CRUD 操作
+
+### 文件：app/crud/user.py
+
+```python
+"""
+用户 CRUD 操作
+"""
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, delete
-from typing import List, Optional
+from typing import Optional, List
 from datetime import datetime
 
-class CRUDOperations:
-    """CRUD 操作类"""
-    
-    def __init__(self, db: Session):
-        self.db = db
-    
-    # ============ 用户 CRUD ============
-    
-    def create_user(
-        self,
-        username: str,
-        email: str,
-        hashed_password: str
-    ) -> User:
-        """创建用户"""
-        user = User(
-            username=username,
-            email=email,
-            hashed_password=hashed_password
-        )
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-        return user
-    
-    def get_user(self, user_id: int) -> Optional[User]:
-        """根据ID获取用户"""
-        return self.db.query(User).filter(User.id == user_id).first()
-    
-    def get_user_by_username(self, username: str) -> Optional[User]:
-        """根据用户名获取用户"""
-        return self.db.query(User).filter(User.username == username).first()
-    
-    def get_users(
-        self,
-        skip: int = 0,
-        limit: int = 100,
-        is_active: Optional[bool] = None
-    ) -> List[User]:
-        """获取用户列表"""
-        query = self.db.query(User)
-        
-        if is_active is not None:
-            query = query.filter(User.is_active == is_active)
-        
-        return query.offset(skip).limit(limit).all()
-    
-    def update_user(
-        self,
-        user_id: int,
-        **kwargs
-    ) -> Optional[User]:
-        """更新用户"""
-        user = self.get_user(user_id)
-        if user:
-            for key, value in kwargs.items():
-                if hasattr(user, key):
-                    setattr(user, key, value)
-            user.updated_at = datetime.utcnow()
-            self.db.commit()
-            self.db.refresh(user)
-        return user
-    
-    def delete_user(self, user_id: int) -> bool:
-        """删除用户"""
-        user = self.get_user(user_id)
-        if user:
-            self.db.delete(user)
-            self.db.commit()
-            return True
-        return False
-    
-    # ============ 任务 CRUD ============
-    
-    def create_task(
-        self,
-        title: str,
-        owner_id: int,
-        description: str = None,
-        priority: int = 2
-    ) -> Task:
-        """创建任务"""
-        task = Task(
-            title=title,
-            description=description,
-            priority=priority,
-            owner_id=owner_id
-        )
-        self.db.add(task)
-        self.db.commit()
-        self.db.refresh(task)
-        return task
-    
-    def get_task(self, task_id: int) -> Optional[Task]:
-        """根据ID获取任务"""
-        return self.db.query(Task).filter(Task.id == task_id).first()
-    
-    def get_tasks(
-        self,
-        owner_id: Optional[int] = None,
-        status: Optional[str] = None,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Task]:
-        """获取任务列表"""
-        query = self.db.query(Task)
-        
-        if owner_id is not None:
-            query = query.filter(Task.owner_id == owner_id)
-        if status is not None:
-            query = query.filter(Task.status == status)
-        
-        return query.offset(skip).limit(limit).all()
-    
-    def update_task(
-        self,
-        task_id: int,
-        **kwargs
-    ) -> Optional[Task]:
-        """更新任务"""
-        task = self.get_task(task_id)
-        if task:
-            for key, value in kwargs.items():
-                if hasattr(task, key):
-                    setattr(task, key, value)
-            task.updated_at = datetime.utcnow()
-            self.db.commit()
-            self.db.refresh(task)
-        return task
-    
-    def delete_task(self, task_id: int) -> bool:
-        """删除任务"""
-        task = self.get_task(task_id)
-        if task:
-            self.db.delete(task)
-            self.db.commit()
-            return True
-        return False
-    
-    # ============ 复杂查询 ============
-    
-    def search_tasks(
-        self,
-        keyword: str,
-        owner_id: Optional[int] = None
-    ) -> List[Task]:
-        """搜索任务"""
-        query = self.db.query(Task)
-        
-        if keyword:
-            query = query.filter(
-                (Task.title.contains(keyword)) |
-                (Task.description.contains(keyword))
-            )
-        
-        if owner_id:
-            query = query.filter(Task.owner_id == owner_id)
-        
-        return query.all()
-    
-    def get_user_tasks_with_stats(self, user_id: int) -> dict:
-        """获取用户任务统计"""
-        user = self.get_user(user_id)
-        if not user:
-            return {}
-        
-        tasks = self.db.query(Task).filter(Task.owner_id == user_id).all()
-        
-        stats = {
-            "total": len(tasks),
-            "pending": sum(1 for t in tasks if t.status == "pending"),
-            "in_progress": sum(1 for t in tasks if t.status == "in_progress"),
-            "completed": sum(1 for t in tasks if t.status == "completed"),
-        }
-        
-        return {
-            "user": user.username,
-            "stats": stats
-        }
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
 
-# 使用示例
-if __name__ == "__main__":
-    # 创建数据库表
-    create_tables()
+
+def get_user(db: Session, user_id: int) -> Optional[User]:
+    """根据ID获取用户"""
+    return db.query(User).filter(User.id == user_id).first()
+
+
+def get_user_by_username(db: Session, username: str) -> Optional[User]:
+    """根据用户名获取用户"""
+    return db.query(User).filter(User.username == username).first()
+
+
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    """根据邮箱获取用户"""
+    return db.query(User).filter(User.email == email).first()
+
+
+def get_users(
+    db: Session, 
+    skip: int = 0, 
+    limit: int = 100,
+    is_active: Optional[bool] = None
+) -> List[User]:
+    """获取用户列表"""
+    query = db.query(User)
     
-    # 创建数据库会话
-    db = SessionLocal()
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
     
-    try:
-        # 创建 CRUD 操作对象
-        crud = CRUDOperations(db)
-        
-        # 创建用户
-        user1 = crud.create_user(
-            username="zhangsan",
-            email="zhangsan@example.com",
-            hashed_password="hashed_password_123"
-        )
-        print(f"创建用户: {user1}")
-        
-        # 创建任务
-        task1 = crud.create_task(
-            title="学习 SQLAlchemy",
-            description="掌握 ORM 基础",
-            owner_id=user1.id,
-            priority=3
-        )
-        print(f"创建任务: {task1}")
-        
-        # 查询用户
-        user = crud.get_user(user1.id)
-        print(f"查询用户: {user}")
-        
-        # 查询任务
-        tasks = crud.get_tasks(owner_id=user1.id)
-        print(f"用户任务: {tasks}")
-        
-        # 更新任务状态
-        updated_task = crud.update_task(task1.id, status="completed")
-        print(f"更新任务: {updated_task}")
-        
-        # 获取统计信息
-        stats = crud.get_user_tasks_with_stats(user1.id)
-        print(f"统计信息: {stats}")
-        
-    finally:
-        db.close()
-```
+    return query.offset(skip).limit(limit).all()
 
-```python
-# FastAPI 集成示例
 
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import List, Optional
-
-app = FastAPI(title="Agent Factory API - SQLAlchemy 集成")
-
-# Pydantic 模型
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str
-
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    email: str
-    is_active: bool
-    
-    class Config:
-        from_attributes = True
-
-class TaskCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    priority: int = 2
-
-class TaskResponse(BaseModel):
-    id: int
-    title: str
-    description: Optional[str]
-    status: str
-    priority: int
-    owner_id: int
-    
-    class Config:
-        from_attributes = True
-
-# 依赖注入：获取数据库会话
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# API 端点
-@app.post("/users/", response_model=UserResponse)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+def create_user(db: Session, user_in: UserCreate, password_hash: str) -> User:
     """创建用户"""
-    crud = CRUDOperations(db)
-    
-    # 检查用户名是否已存在
-    existing_user = crud.get_user_by_username(user.username)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="用户名已存在")
-    
-    # 创建用户（实际应用中应该哈希密码）
-    return crud.create_user(
-        username=user.username,
-        email=user.email,
-        hashed_password=user.password  # 实际应用中应该哈希
+    user = User(
+        username=user_in.username,
+        email=user_in.email,
+        full_name=user_in.full_name,
+        password_hash=password_hash
     )
-
-@app.get("/users/{user_id}", response_model=UserResponse)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    """获取用户"""
-    crud = CRUDOperations(db)
-    user = crud.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return user
 
-@app.get("/users/", response_model=List[UserResponse])
-def read_users(
+
+def update_user(
+    db: Session, 
+    user: User, 
+    user_in: UserUpdate,
+    password_hash: Optional[str] = None
+) -> User:
+    """更新用户"""
+    update_data = user_in.model_dump(exclude_unset=True)
+    
+    if password_hash:
+        update_data["password_hash"] = password_hash
+    
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    user.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_user(db: Session, user_id: int) -> bool:
+    """删除用户"""
+    user = get_user(db, user_id)
+    if not user:
+        return False
+    
+    db.delete(user)
+    db.commit()
+    return True
+
+
+def authenticate_user(
+    db: Session, 
+    username: str, 
+    password_hash: str
+) -> Optional[User]:
+    """验证用户"""
+    user = get_user_by_username(db, username)
+    if not user:
+        return None
+    if user.password_hash != password_hash:
+        return None
+    return user
+
+
+def update_last_login(db: Session, user: User) -> User:
+    """更新最后登录时间"""
+    user.last_login = datetime.utcnow()
+    db.commit()
+    db.refresh(user)
+    return user
+```
+
+### 文件：app/crud/task.py
+
+```python
+"""
+任务 CRUD 操作
+"""
+
+from sqlalchemy.orm import Session
+from typing import Optional, List
+from datetime import datetime
+
+from app.models.task import Task, TaskStatus, TaskPriority
+from app.schemas.task import TaskCreate, TaskUpdate
+
+
+def get_task(db: Session, task_id: int) -> Optional[Task]:
+    """根据ID获取任务"""
+    return db.query(Task).filter(Task.id == task_id).first()
+
+
+def get_tasks(
+    db: Session,
+    owner_id: Optional[int] = None,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    search: Optional[str] = None,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 100
+) -> tuple[List[Task], int]:
+    """获取任务列表"""
+    query = db.query(Task)
+    
+    # 过滤条件
+    if owner_id:
+        query = query.filter(Task.owner_id == owner_id)
+    if status:
+        query = query.filter(Task.status == status.value)
+    if priority:
+        query = query.filter(Task.priority == priority.value)
+    if search:
+        query = query.filter(Task.title.contains(search))
+    
+    # 总数
+    total = query.count()
+    
+    # 分页
+    tasks = query.offset(skip).limit(limit).all()
+    
+    return tasks, total
+
+
+def create_task(db: Session, task_in: TaskCreate, owner_id: int) -> Task:
+    """创建任务"""
+    task = Task(
+        title=task_in.title,
+        description=task_in.description,
+        priority=task_in.priority.value,
+        owner_id=owner_id
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def update_task(db: Session, task: Task, task_in: TaskUpdate) -> Task:
+    """更新任务"""
+    update_data = task_in.model_dump(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        if field == "status":
+            setattr(task, field, value.value)
+            if value == TaskStatus.COMPLETED:
+                task.completed_at = datetime.utcnow()
+        elif field == "priority":
+            setattr(task, field, value.value)
+        else:
+            setattr(task, field, value)
+    
+    task.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def delete_task(db: Session, task_id: int) -> bool:
+    """删除任务"""
+    task = get_task(db, task_id)
+    if not task:
+        return False
+    
+    db.delete(task)
+    db.commit()
+    return True
+
+
+def get_user_tasks_stats(db: Session, owner_id: int) -> dict:
+    """获取用户任务统计"""
+    tasks = db.query(Task).filter(Task.owner_id == owner_id).all()
+    
+    stats = {
+        "total": len(tasks),
+        "by_status": {},
+        "by_priority": {}
+    }
+    
+    for task in tasks:
+        # 按状态统计
+        status = task.status
+        stats["by_status"][status] = stats["by_status"].get(status, 0) + 1
+        
+        # 按优先级统计
+        priority = task.priority
+        stats["by_priority"][priority] = stats["by_priority"].get(priority, 0) + 1
+    
+    return stats
+```
+
+---
+
+## 第七部分：FastAPI 集成
+
+### 文件：app/main.py（完整版本）
+
+```python
+"""
+Agent Factory API - 完整版本（含数据库）
+"""
+
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from typing import List
+from datetime import datetime
+
+from app.database import get_db, init_db
+from app.models.user import User
+from app.models.task import Task
+from app.schemas.user import (
+    UserCreate, UserUpdate, UserResponse, UserLogin, UserListResponse
+)
+from app.schemas.task import (
+    TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
+    TaskStatusEnum, TaskPriorityEnum
+)
+from app.crud.user import (
+    get_user, get_user_by_username, get_user_by_email,
+    get_users, create_user, update_user, delete_user,
+    authenticate_user, update_last_login
+)
+from app.crud.task import (
+    get_task, get_tasks, create_task, update_task, delete_task,
+    get_user_tasks_stats
+)
+
+# 创建应用
+app = FastAPI(
+    title="Agent Factory API",
+    description="智能体工厂的后端 API 服务",
+    version="0.1.0"
+)
+
+
+# 启动事件
+@app.on_event("startup")
+async def startup():
+    """应用启动时初始化数据库"""
+    init_db()
+
+
+# ==================== 用户 API ====================
+
+@app.post(
+    "/api/v1/users",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="创建用户"
+)
+async def create_user_endpoint(
+    user_in: UserCreate,
+    db: Session = Depends(get_db)
+):
+    """创建新用户"""
+    # 检查用户名是否已存在
+    if get_user_by_username(db, user_in.username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名已存在"
+        )
+    
+    # 检查邮箱是否已存在
+    if get_user_by_email(db, user_in.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="邮箱已被注册"
+        )
+    
+    # 创建用户（实际应用中应该哈希密码）
+    return create_user(db, user_in, user_in.password)
+
+
+@app.get(
+    "/api/v1/users",
+    response_model=UserListResponse,
+    summary="获取用户列表"
+)
+async def list_users_endpoint(
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(10, ge=1, le=100, description="返回数量"),
+    is_active: bool = Query(None, description="是否激活"),
     db: Session = Depends(get_db)
 ):
     """获取用户列表"""
-    crud = CRUDOperations(db)
-    return crud.get_users(skip=skip, limit=limit)
-
-@app.post("/tasks/", response_model=TaskResponse)
-def create_task(task: TaskCreate, owner_id: int, db: Session = Depends(get_db)):
-    """创建任务"""
-    crud = CRUDOperations(db)
+    users = get_users(db, skip=skip, limit=limit, is_active=is_active)
+    total = len(users)  # 实际应用中应该单独查询总数
     
-    # 检查用户是否存在
-    user = crud.get_user(owner_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-    
-    return crud.create_task(
-        title=task.title,
-        description=task.description,
-        priority=task.priority,
-        owner_id=owner_id
+    return UserListResponse(
+        users=users,
+        total=total,
+        page=skip // limit + 1,
+        page_size=limit
     )
 
-@app.get("/tasks/{task_id}", response_model=TaskResponse)
-def read_task(task_id: int, db: Session = Depends(get_db)):
-    """获取任务"""
-    crud = CRUDOperations(db)
-    task = crud.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    return task
 
-@app.put("/tasks/{task_id}", response_model=TaskResponse)
-def update_task(
-    task_id: int,
-    task_update: TaskCreate,
+@app.get(
+    "/api/v1/users/{user_id}",
+    response_model=UserResponse,
+    summary="获取用户详情"
+)
+async def get_user_endpoint(
+    user_id: int,
     db: Session = Depends(get_db)
 ):
-    """更新任务"""
-    crud = CRUDOperations(db)
-    task = crud.update_task(task_id, **task_update.model_dump())
+    """根据ID获取用户"""
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"用户ID {user_id} 不存在"
+        )
+    return user
+
+
+@app.put(
+    "/api/v1/users/{user_id}",
+    response_model=UserResponse,
+    summary="更新用户"
+)
+async def update_user_endpoint(
+    user_id: int,
+    user_in: UserUpdate,
+    db: Session = Depends(get_db)
+):
+    """更新用户信息"""
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"用户ID {user_id} 不存在"
+        )
+    
+    # 如果更新邮箱，检查是否已存在
+    if user_in.email:
+        existing_user = get_user_by_email(db, user_in.email)
+        if existing_user and existing_user.id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="邮箱已被注册"
+            )
+    
+    return update_user(db, user, user_in)
+
+
+@app.delete(
+    "/api/v1/users/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除用户"
+)
+async def delete_user_endpoint(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """删除用户"""
+    if not delete_user(db, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"用户ID {user_id} 不存在"
+        )
+    return None
+
+
+# ==================== 任务 API ====================
+
+@app.post(
+    "/api/v1/users/{user_id}/tasks",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="创建任务"
+)
+async def create_task_endpoint(
+    user_id: int,
+    task_in: TaskCreate,
+    db: Session = Depends(get_db)
+):
+    """为用户创建任务"""
+    # 检查用户是否存在
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"用户ID {user_id} 不存在"
+        )
+    
+    return create_task(db, task_in, user_id)
+
+
+@app.get(
+    "/api/v1/users/{user_id}/tasks",
+    response_model=TaskListResponse,
+    summary="获取用户任务列表"
+)
+async def list_user_tasks_endpoint(
+    user_id: int,
+    status: TaskStatusEnum = Query(None, description="按状态过滤"),
+    priority: TaskPriorityEnum = Query(None, description="按优先级过滤"),
+    search: str = Query(None, description="搜索标题"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """获取用户的任务列表"""
+    # 检查用户是否存在
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"用户ID {user_id} 不存在"
+        )
+    
+    tasks, total = get_tasks(
+        db,
+        owner_id=user_id,
+        status=status,
+        priority=priority,
+        search=search,
+        skip=skip,
+        limit=limit
+    )
+    
+    return TaskListResponse(
+        tasks=tasks,
+        total=total,
+        page=skip // limit + 1,
+        page_size=limit
+    )
+
+
+@app.get(
+    "/api/v1/tasks/{task_id}",
+    response_model=TaskResponse,
+    summary="获取任务详情"
+)
+async def get_task_endpoint(
+    task_id: int,
+    db: Session = Depends(get_db)
+):
+    """根据ID获取任务"""
+    task = get_task(db, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
     return task
 
-@app.delete("/tasks/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
+
+@app.put(
+    "/api/v1/tasks/{task_id}",
+    response_model=TaskResponse,
+    summary="更新任务"
+)
+async def update_task_endpoint(
+    task_id: int,
+    task_in: TaskUpdate,
+    db: Session = Depends(get_db)
+):
+    """更新任务信息"""
+    task = get_task(db, task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
+    
+    return update_task(db, task, task_in)
+
+
+@app.delete(
+    "/api/v1/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除任务"
+)
+async def delete_task_endpoint(
+    task_id: int,
+    db: Session = Depends(get_db)
+):
     """删除任务"""
-    crud = CRUDOperations(db)
-    if not crud.delete_task(task_id):
-        raise HTTPException(status_code=404, detail="任务不存在")
-    return {"message": "任务已删除"}
+    if not delete_task(db, task_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务ID {task_id} 不存在"
+        )
+    return None
+
+
+@app.get(
+    "/api/v1/users/{user_id}/tasks/stats",
+    summary="获取用户任务统计"
+)
+async def get_user_tasks_stats_endpoint(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """获取用户的任务统计信息"""
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"用户ID {user_id} 不存在"
+        )
+    
+    return get_user_tasks_stats(db, user_id)
+
+
+# ==================== 启动 ====================
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 数据库连接失败 | 检查数据库 URL，确保文件路径正确 |
-| 2 | 表已存在错误 | 使用 `check_same_thread=False` 参数 |
-| 3 | 关系查询报错 | 检查 relationship 定义和外键 |
-| 4 | 异步操作报错 | 确保使用 aiosqlite 驱动 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| ORM | 对象关系映射，将类映射到数据库表 |
-| SQLAlchemy | Python 的 SQL 工具包和 ORM |
+## 第八部分：测试完整流程
+
+### 测试脚本
+
+```bash
+#!/bin/bash
+# test_api.sh - 测试脚本
+
+echo "=== 创建用户 ==="
+curl -X POST http://localhost:8000/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "email": "john@example.com",
+    "full_name": "John Doe",
+    "password": "SecurePass123"
+  }' | jq .
+
+echo -e "\n=== 创建任务 ==="
+curl -X POST http://localhost:8000/api/v1/users/1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "学习 FastAPI",
+    "description": "完成 Day 3 的学习内容",
+    "priority": "high",
+    "tags": ["学习", "Python"]
+  }' | jq .
+
+echo -e "\n=== 获取用户任务列表 ==="
+curl "http://localhost:8000/api/v1/users/1/tasks" | jq .
+
+echo -e "\n=== 更新任务状态 ==="
+curl -X PUT http://localhost:8000/api/v1/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "completed"
+  }' | jq .
+
+echo -e "\n=== 获取任务统计 ==="
+curl "http://localhost:8000/api/v1/users/1/tasks/stats" | jq .
+```
+
+---
+
+## 验证清单
+
+完成今日学习后，检查以下项目：
+
+- [ ] 理解 ORM 的概念和优势
+- [ ] SQLAlchemy 2.0 安装成功
+- [ ] 数据库模型定义正确
+- [ ] 数据库表创建成功
+- [ ] 用户 CRUD 操作正常
+- [ ] 任务 CRUD 操作正常
+- [ ] 关系查询正常工作
+- [ ] FastAPI 集成成功
+- [ ] 完成了测试脚本
+
+---
+
+## 今日小结
+
+| 概念 | 关键点 |
+|------|--------|
+| ORM | 对象关系映射，简化数据库操作 |
+| SQLAlchemy | Python 最流行的 ORM |
+| 模型定义 | 使用类定义数据库表结构 |
+| 关系 | 一对一、一对多、多对多 |
+| CRUD | 创建、读取、更新、删除 |
 | 会话 | 数据库连接的封装 |
-| 模型 | 映射到数据库表的 Python 类 |
-| 关系 | 表之间的关联（一对一、一对多等） |
-| CRUD | 创建、读取、更新、删除操作 |
+| 依赖注入 | FastAPI 自动管理数据库会话 |
 
-## ✅ 验收清单
-- [ ] 能配置 SQLAlchemy 2.0 数据库连接
-- [ ] 能定义复杂的数据模型和关系
-- [ ] 实现完整的 CRUD 操作
-- [ ] 能在 FastAPI 中集成数据库操作
+---
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+## 明日预告
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+明天我们将学习：
+- JWT 认证机制
+- 密码哈希
+- 认证中间件
+- 保护 API 端点
+
+---
+
+## 参考资源
+
+- [SQLAlchemy 2.0 文档](https://docs.sqlalchemy.org/)
+- [FastAPI 数据库教程](https://fastapi.tiangolo.com/tutorial/sql-databases/)
+- [SQLite 文档](https://www.sqlite.org/docs.html)

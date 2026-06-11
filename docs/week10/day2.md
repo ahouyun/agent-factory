@@ -1,368 +1,613 @@
-# 📅 Week 10 Day 2：LoRA / QLoRA 高效微调原理
+# 📅 Week 10 Day 2：LoRA/QLoRA + 小模型微调原理
+
+---
 
 ## 🧭 今日方向
-> 掌握 LoRA 和 QLoRA 的核心思想，学会用极少的参数量微调大模型，降低显存需求。
+
+今天我们深入参数高效微调（PEFT）的核心技术——LoRA 和 QLoRA。这些技术让我们用极少的计算资源就能微调大模型，是实际工程中最常用的微调方案。
+
+**核心问题：** 如何用一张消费级显卡（甚至 CPU）微调一个数十亿参数的大模型？
+
+---
 
 ## 🎯 生活比喻
-> 想象你要修改一本 500 页的教科书。Full Fine-tuning 相当于把整本书重新抄一遍（改所有参数）；LoRA 相当于在书页边缘贴便利贴，只写需要修改的批注（低秩矩阵）；QLoRA 相当于先用缩印版（量化模型）来贴批注，省纸又省空间。三者的区别在于"改多少"和"占多少空间"。
+
+想象你要给一栋大楼（预训练模型）重新装修：
+
+- **全量微调** = 把整栋楼拆了重建，成本极高、耗时极长
+- **LoRA** = 只在关键房间（注意力层）装上可拆卸的模块，不动主体结构
+- **QLoRA** = 先把不常用的房间锁起来（4-bit 量化），再在关键房间装模块
+
+LoRA 的核心思想是：**大模型的权重更新矩阵是低秩的**，不需要更新全部参数，只需要更新一个低秩的"增量矩阵"即可。
+
+---
 
 ## 📋 今日三件事
-1. 理解 LoRA 的低秩分解原理（为什么可以只训练 0.1% 的参数）
-2. 掌握 QLoRA 的量化 + LoRA 组合方案（4bit 训练）
-3. 动手实现一个 LoRA 层并验证参数量对比
+
+1. **理解 LoRA 的数学原理**——低秩分解与参数效率
+2. **理解 QLoRA 的量化机制**——如何用 4-bit 存储 + 16-bit 训练
+3. **掌握 Hugging Face PEFT 库的使用**——配置 LoRA 适配器
+
+---
 
 ## 🗺️ 手把手路线
 
-### Step 1：理解矩阵低秩分解
-- 做什么: 学习 SVD 分解，理解为什么大矩阵可以用两个小矩阵近似
-- 为什么: LoRA 的核心就是低秩分解，不理解这个就无法理解 LoRA
-- 成功标志: 能手算一个 4x4 矩阵的低秩近似
+### 第一步：环境准备
 
-### Step 2：理解 LoRA 层
-- 做什么: 学习 LoRA 如何在原始权重旁插入低秩旁路
-- 为什么: 这是高效微调的核心创新
-- 成功标志: 能画出 LoRA 的结构图并标注参数量
+```bash
+pip install torch transformers datasets peft bitsandbytes accelerate
+```
 
-### Step 3：理解 QLoRA
-- 做什么: 学习 4-bit 量化原理 + NF4 数据类型 + 双重量化
-- 为什么: QLoRA 让单张消费级 GPU 也能微调大模型
-- 成功标志: 能解释 QLoRA 比 LoRA 省多少显存
+### 第二步：理解 LoRA 的数学原理
 
-### Step 4：代码实践
-- 做什么: 从零实现 LoRA 层，对比参数量
-- 为什么: 代码是最好的理解方式
-- 成功标志: 代码跑通，输出参数量对比表
+```
+原始权重矩阵 W ∈ R^(d×k)（例如 4096×4096 = 16M 参数）
+
+LoRA 分解:
+  W' = W + ΔW = W + B × A
+
+  其中:
+    A ∈ R^(r×k)    例如 r=8, k=4096 → 32K 参数
+    B ∈ R^(d×r)    例如 d=4096, r=8 → 32K 参数
+    r << d          秩（rank），通常 4-64
+
+  可训练参数: 2 × d × r = 2 × 4096 × 8 = 65K 参数
+  占原始参数比例: 65K / 16M = 0.4%
+```
+
+---
 
 ## 💻 代码区
 
+### 代码 1：LoRA 数学原理与手动实现
+
 ```python
 """
-从零实现 LoRA 和 QLoRA 的核心原理
-不依赖 PEFT 库，手动实现 LoRA 层
+Day 2 - LoRA 数学原理与手动实现
+不依赖 PEFT 库，用纯 PyTorch 演示 LoRA 的核心思想
 """
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-from typing import Optional, Tuple
 import math
 
-# ========== 1. 原始线性层 vs LoRA 层 ==========
+print("=" * 60)
+print("LoRA 数学原理与手动实现")
+print("=" * 60)
 
-class OriginalLinear(nn.Module):
-    """原始的全连接层"""
-    def __init__(self, in_features: int, out_features: int):
-        super().__init__()
-        self.weight = nn.Parameter(torch.randn(out_features, in_features))
-        self.bias = nn.Parameter(torch.randn(out_features))
-    
-    def forward(self, x):
-        return F.linear(x, self.weight, self.bias)
-    
-    def num_parameters(self):
-        return self.weight.numel() + self.bias.numel()
-
+# ============================================================
+# 1. 原始线性层 vs LoRA 线性层
+# ============================================================
 
 class LoRALinear(nn.Module):
     """
-    LoRA 线性层
-    核心思想：W' = W + B @ A，其中 A, B 是低秩矩阵
-    训练时冻结原始权重 W，只训练 A 和 B
+    LoRA 线性层：在原始线性层旁添加低秩分解矩阵
+
+    前向传播:
+      h = W_0 @ x + (B @ A) @ x @ (alpha / r)
+
+    其中:
+      W_0: 原始权重矩阵（冻结，不训练）
+      A, B: 低秩分解矩阵（可训练）
+      alpha: 缩放因子
+      r: 秩（rank）
     """
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        rank: int = 4,
-        alpha: float = 1.0,
-        dropout: float = 0.1
-    ):
+
+    def __init__(self, original_linear, r=8, alpha=16):
         super().__init__()
-        # 原始权重（冻结，不训练）
-        self.weight = nn.Parameter(
-            torch.randn(out_features, in_features), requires_grad=False
-        )
-        self.bias = nn.Parameter(
-            torch.randn(out_features), requires_grad=False
-        )
-        
-        # LoRA 旁路：低秩矩阵 A 和 B
-        self.lora_A = nn.Parameter(torch.randn(rank, in_features))
-        self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
-        
-        # 缩放因子
-        self.scaling = alpha / rank
-        
-        # Dropout
-        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        
-        # 初始化
-        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_B)
-    
+        self.original = original_linear
+        self.original.weight.requires_grad = False  # 冻结原始权重
+
+        in_features = original_linear.in_features
+        out_features = original_linear.out_features
+
+        # LoRA 分解矩阵
+        self.lora_A = nn.Parameter(torch.randn(r, in_features) * (1 / math.sqrt(r)))
+        self.lora_B = nn.Parameter(torch.zeros(out_features, r))
+        self.scaling = alpha / r
+
     def forward(self, x):
-        # 原始路径
-        original_output = F.linear(x, self.weight, self.bias)
-        
-        # LoRA 路径
-        lora_output = F.linear(F.linear(self.dropout(x), self.lora_A), self.lora_B)
-        
-        return original_output + lora_output * self.scaling
-    
-    def num_parameters(self):
-        """只计算可训练参数"""
-        return self.lora_A.numel() + self.lora_B.numel()
+        # 原始输出
+        original_output = self.original(x)
+        # LoRA 增量
+        lora_output = (x @ self.lora_A.T @ self.lora_B.T) * self.scaling
+        return original_output + lora_output
 
 
-# ========== 2. 低秩分解的数学原理 ==========
+# 演示
+print("\n1. LoRA 参数量对比")
+print("-" * 40)
 
-def demonstrate_low_rank():
-    """演示低秩分解的原理"""
-    print("低秩分解演示")
-    print("=" * 50)
-    
-    # 创建一个低秩矩阵
-    m, k, n = 8, 8, 8
-    rank = 2
-    
-    # 生成一个秩为 rank 的矩阵
-    A = torch.randn(m, rank)
-    B = torch.randn(rank, n)
-    W_low_rank = A @ B  # 秩为 rank 的矩阵
-    
-    print(f"原始矩阵形状: {W_low_rank.shape}")
-    print(f"矩阵的秩: {torch.linalg.matrix_rank(W_low_rank).item()}")
-    
-    # Full 参数量
-    full_params = m * n
-    # LoRA 参数量
-    lora_params = m * rank + rank * n
-    
-    print(f"\nFull 参数量: {full_params}")
-    print(f"LoRA 参数量 (rank={rank}): {lora_params}")
-    print(f"压缩比: {lora_params/full_params*100:.1f}%")
-    
-    # SVD 分解
-    U, S, Vh = torch.linalg.svd(W_low_rank)
-    print(f"\nSVD 分解后:")
-    print(f"  U 形状: {U.shape}")
-    print(f"  S (奇异值): {S.tolist()}")
-    print(f"  Vh 形状: {Vh.shape}")
+d, k = 4096, 4096  # 原始矩阵维度
+r = 8               # LoRA 秩
+alpha = 16          # 缩放因子
 
+original_params = d * k
+lora_params = r * k + d * r  # A矩阵 + B矩阵
 
-# ========== 3. QLoRA：量化 + LoRA ==========
+print(f"  原始矩阵 W: {d} x {k} = {original_params:,} 参数")
+print(f"  LoRA 矩阵 A: {r} x {k} = {r * k:,} 参数")
+print(f"  LoRA 矩阵 B: {d} x {r} = {d * r:,} 参数")
+print(f"  LoRA 总参数: {lora_params:,}")
+print(f"  参数比例: {lora_params / original_params * 100:.2f}%")
 
-def demonstrate_qlora_concept():
-    """演示 QLoRA 的概念（不实际量化，用模拟展示）"""
-    print("\nQLoRA 概念演示")
-    print("=" * 50)
-    
-    # 模拟量化过程
-    W = torch.randn(4, 4)
-    print(f"原始权重 (FP32, 32bit):")
-    print(f"  占用内存: {W.element_size() * W.numel()} bytes")
-    print(f"  数据类型: float32")
-    
-    # 模拟 INT8 量化
-    W_int8 = W.to(torch.int8)
-    print(f"\n量化后 (INT8, 8bit):")
-    print(f"  占用内存: {W_int8.element_size() * W_int8.numel()} bytes")
-    print(f"  压缩比: {W_int8.element_size() / W.element_size() * 100:.1f}%")
-    
-    # 模拟 INT4 量化（QLoRA 使用的精度）
-    print(f"\nQLoRA 使用的 NF4 量化 (4bit):")
-    print(f"  理论占用: {W.numel() * 0.5} bytes (4bit = 0.5 byte)")
-    print(f"  压缩比: {(0.5 / W.element_size()) * 100:.1f}%")
-    
-    # 显存对比
-    print("\n7B 模型显存对比:")
-    print(f"  FP32: {7 * 1024**3 / 1024**3:.1f} GB")
-    print(f"  FP16: {7 * 2 / 1024**3 * 1024**3:.1f} GB")
-    print(f"  INT8: {7 * 1 / 1024**3 * 1024**3:.1f} GB")
-    print(f"  INT4 (QLoRA): {7 * 0.5 / 1024**3 * 1024**3:.2f} GB")
+# ============================================================
+# 2. 不同 rank 的参数量对比
+# ============================================================
+print("\n2. 不同 rank 的参数量对比")
+print("-" * 40)
 
+for rank in [4, 8, 16, 32, 64]:
+    lora_p = rank * k + d * rank
+    ratio = lora_p / original_params * 100
+    print(f"  rank={rank:2d}: {lora_p:>10,} 参数 ({ratio:.2f}%)")
 
-# ========== 4. 完整的 LoRA 微调流程 ==========
+# ============================================================
+# 3. 手动实现 LoRA 微调
+# ============================================================
+print("\n3. 手动 LoRA 微调示例")
+print("-" * 40)
 
-class SimpleTransformerBlock(nn.Module):
-    """简化的 Transformer Block"""
-    def __init__(self, d_model=128, n_heads=4):
-        super().__init__()
-        self.attention = nn.MultiheadAttention(d_model, n_heads, batch_first=True)
-        self.norm1 = nn.LayerNorm(d_model)
-        self.ff = nn.Sequential(
-            nn.Linear(d_model, d_model * 4),
-            nn.ReLU(),
-            nn.Linear(d_model * 4, d_model)
-        )
-        self.norm2 = nn.LayerNorm(d_model)
-    
-    def forward(self, x):
-        attn_out, _ = self.attention(x, x, x)
-        x = self.norm1(x + attn_out)
-        ff_out = self.ff(x)
-        x = self.norm2(x + ff_out)
-        return x
+# 创建一个原始线性层
+original_linear = nn.Linear(512, 512)
+print(f"  原始参数量: {sum(p.numel() for p in original_linear.parameters()):,}")
 
+# 包装为 LoRA 层
+lora_layer = LoRALinear(original_linear, r=8, alpha=16)
+print(f"  LoRA 后参数量: {sum(p.numel() for p in lora_layer.parameters()):}")
+print(f"  可训练参数量: {sum(p.numel() for p in lora_layer.parameters() if p.requires_grad):}")
 
-def apply_lora_to_model():
-    """展示如何给模型添加 LoRA"""
-    print("\nLoRA 应用演示")
-    print("=" * 50)
-    
-    # 创建原始模型
-    d_model = 128
-    model = SimpleTransformerBlock(d_model=d_model)
-    
-    # 计算原始参数量
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"原始模型参数量: {total_params:,}")
-    
-    # 模拟 LoRA 应用
-    lora_rank = 4
-    lora_params = 2 * d_model * lora_rank  # A + B 矩阵
-    print(f"\nLoRA 配置:")
-    print(f"  Rank: {lora_rank}")
-    print(f"  每层 LoRA 参数: {lora_params:,}")
-    print(f"  可训练参数占比: {lora_params/total_params*100:.2f}%")
-    
-    # LoRA 微调的优势
-    print(f"\nLoRA 微调优势:")
-    print(f"  1. 显存占用: 只需存储 LoRA 参数的梯度")
-    print(f"  2. 训练速度: 冻结原始权重，减少计算量")
-    print(f"  3. 模型合并: W' = W + B@A，推理无额外开销")
+# 冻结比例
+total = sum(p.numel() for p in lora_layer.parameters())
+trainable = sum(p.numel() for p in lora_layer.parameters() if p.requires_grad)
+frozen = total - trainable
+print(f"  冻结参数: {frozen:,} ({frozen/total*100:.1f}%)")
+print(f"  可训练参数: {trainable:,} ({trainable/total*100:.1f}%)")
 
+# ============================================================
+# 4. LoRA 应用到 Transformer 注意力层
+# ============================================================
+print("\n4. LoRA 应用到 Transformer 注意力层")
+print("-" * 40)
 
-# ========== 5. LoRA 参数选择指南 ==========
+from transformers import AutoModelForCausalLM
 
-def lora_rank_guide():
-    """LoRA rank 选择指南"""
-    print("\nLoRA Rank 选择指南")
-    print("=" * 50)
-    
-    ranks = [2, 4, 8, 16, 32, 64]
-    d_model = 2048  # 典型的大模型维度
-    
-    print(f"假设 d_model = {d_model}:")
-    print(f"{'Rank':<8}{'参数量':<15}{'占 d_model^2 比例':<20}{'适用场景'}")
-    print("-" * 70)
-    
-    scenarios = {
-        2: "简单分类/NER",
-        4: "基础指令微调",
-        8: "复杂指令微调",
-        16: "多任务学习",
-        32: "领域适应",
-        64: "接近全参数微调"
-    }
-    
-    for rank in ranks:
-        params = d_model * rank * 2  # A + B
-        ratio = params / (d_model ** 2) * 100
-        scenario = scenarios[rank]
-        print(f"{rank:<8}{params:<15,}{ratio:<20.2f}%{scenario}")
+print("""
+  在 Transformer 中，LoRA 通常应用到以下层：
 
+  1. 注意力层:
+     - q_proj (Query 投影矩阵)
+     - v_proj (Value 投影矩阵)
+     - k_proj (Key 投影矩阵) -- 可选
+     - o_proj (Output 投影矩阵) -- 可选
 
-if __name__ == "__main__":
-    # 运行所有演示
-    demonstrate_low_rank()
-    demonstrate_qlora_concept()
-    apply_lora_to_model()
-    lora_rank_guide()
-    
-    # 实际的 LoRA 层测试
-    print("\n" + "=" * 50)
-    print("LoRA 层功能测试")
-    print("=" * 50)
-    
-    in_features, out_features = 64, 64
-    rank = 4
-    
-    # 原始层
-    original = OriginalLinear(in_features, out_features)
-    # LoRA 层
-    lora = LoRALinear(in_features, out_features, rank=rank)
-    
-    # 测试输入
-    x = torch.randn(2, 10, in_features)
-    
-    # 前向传播
-    with torch.no_grad():
-        out_original = original(x)
-        out_lora = lora(x)
-    
-    print(f"\n输入形状: {x.shape}")
-    print(f"输出形状: {out_original.shape}")
-    print(f"原始层参数量: {original.num_parameters():,}")
-    print(f"LoRA 可训练参数: {lora.num_parameters():,}")
-    print(f"参数压缩比: {lora.num_parameters()/original.num_parameters()*100:.1f}%")
-    print(f"\n输出是否接近 (初始化时): {torch.allclose(out_original, out_lora, atol=0.1)}")
+  2. FFN 层:
+     - gate_proj (门控投影)
+     - up_proj (上投影)
+     - down_proj (下投影)
+
+  推荐配置:
+     target_modules = ["q_proj", "v_proj"]  # 最小配置，效果好
+     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]  # 全注意力
+     target_modules = ["q_proj", "v_proj", "gate_proj", "up_proj", "down_proj"]  # 全部
+""")
+
+# ============================================================
+# 5. LoRA 初始化策略
+# ============================================================
+print("5. LoRA 初始化策略")
+print("-" * 40)
+print("""
+  A 矩阵: 高斯随机初始化（或 Kaiming 初始化）
+  B 矩阵: 全零初始化
+
+  为什么 B 初始化为零？
+  - 初始时 ΔW = B @ A = 0
+  - 模型行为与原始预训练模型完全一致
+  - 训练过程中 B 逐渐学到有意义的值
+  - 这确保了训练稳定性
+""")
+
+# 验证：B 初始化为零时，ΔW = 0
+A_init = torch.randn(8, 512) * 0.01
+B_init = torch.zeros(512, 8)  # 零初始化
+delta_W = B_init @ A_init
+print(f"  ΔW 的 Frobenius 范数: {delta_W.norm():.6f} (应为 0)")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | LoRA 微调后效果差 | 增大 rank，检查学习率，增加训练步数 |
-| 2 | 显存仍然不够 | 使用 QLoRA (4-bit)，减小 batch_size |
-| 3 | LoRA 模型合并后异常 | 检查 scaling 参数，确保 lora_B 初始化为零 |
-| 4 | 训练 loss 震荡 | 降低学习率，增加 warmup 步骤 |
-| 5 | 不知道选什么 rank | 从 rank=8 开始，根据任务复杂度调整 |
+### 代码 2：QLoRA 原理与 4-bit 量化
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| LoRA | 通过低秩矩阵旁路实现高效微调 |
-| Rank | LoRA 矩阵的秩，控制参数量和表达能力 |
-| Alpha | LoRA 的缩放因子，通常等于 rank |
-| QLoRA | 量化基础模型 + LoRA 微调的组合方案 |
-| NF4 | QLoRA 使用的 4-bit NormalFloat 数据类型 |
-| 双重量化 | 对量化常数再次量化的技术 |
-| Adapter | 另一种高效微调方法，在层间插入小模块 |
-| Prefix Tuning | 在输入前添加可训练前缀向量 |
-| Full Fine-tuning | 更新所有模型参数的微调方式 |
+```python
+"""
+Day 2 - QLoRA 原理与 4-bit 量化
+展示 QLoRA 如何进一步降低显存需求
+"""
 
-## ✅ 验收清单
-- [ ] 能解释 LoRA 的低秩分解原理
-- [ ] 能手算 LoRA 参数量 vs 全参数量
-- [ ] 能解释 QLoRA 如何降低显存需求
-- [ ] 代码实现的 LoRA 层能正确运行
-- [ ] 能根据任务选择合适的 rank
+import torch
+import torch.nn as nn
 
-## 🤔 为什么要微调小模型？
+print("=" * 60)
+print("QLoRA 原理与 4-bit 量化")
+print("=" * 60)
 
-### 何时用 API vs 微调
+# ============================================================
+# 1. 显存占用分析
+# ============================================================
+print("\n1. 不同精度的显存占用")
+print("-" * 40)
 
-| 场景 | 推荐方案 | 原因 |
-|------|---------|------|
-| 原型验证 | API 调用 | 快速迭代，无需训练 |
-| 成本敏感 | 微调小模型 | 推理成本低 10-100 倍 |
-| 数据隐私 | 本地微调 | 数据不出本地 |
-| 延迟要求高 | 本地小模型 | 无网络延迟 |
-| 特定领域 | 微调 | 领域知识注入 |
+model_sizes = [
+    ("0.5B", 0.5e9),
+    ("1B", 1e9),
+    ("3B", 3e9),
+    ("7B", 7e9),
+    ("13B", 13e9),
+]
 
-### 小模型的优势
+for name, params in model_sizes:
+    fp32_mb = params * 4 / 1e6
+    fp16_mb = params * 2 / 1e6
+    int8_mb = params * 1 / 1e6
+    int4_mb = params * 0.5 / 1e6
+    print(f"  {name:>4s} 模型: FP32={fp32_mb:>7.0f}MB, "
+          f"FP16={fp16_mb:>7.0f}MB, INT8={int8_mb:>7.0f}MB, INT4={int4_mb:>7.0f}MB")
 
-- **推理成本低**：7B 模型 vs GPT-4，成本差 100 倍
-- **延迟低**：本地部署，无网络开销
-- **可控性强**：完全掌控模型行为
-- **隐私安全**：数据不出本地
+# ============================================================
+# 2. QLoRA 三板斧
+# ============================================================
+print("\n2. QLoRA 三板斧")
+print("-" * 40)
+print("""
+  QLoRA（Quantized LoRA）的核心创新：
 
-### 微调 vs RAG vs Prompt Engineering
+  1. 4-bit NormalFloat (NF4) 量化
+     - 将预训练权重从 FP16 量化到 4-bit
+     - 使用正态分布最优量化点
+     - 显存占用降低 4 倍
 
-| 方案 | 适用场景 | 成本 | 效果 |
-|------|---------|------|------|
-| Prompt Engineering | 简单任务 | 低 | 一般 |
-| RAG | 需要外部知识 | 中 | 好 |
-| 微调 | 需要改变模型行为 | 高 | 最好 |
+  2. 双重量化（Double Quantization）
+     - 对量化常数本身也进行量化
+     - 进一步节省约 0.37 bit/参数
 
-> 建议：先用 Prompt Engineering，不够再用 RAG，最后才考虑微调。
+  3. 分页优化器（Paged Optimizer）
+     - 使用 NVIDIA 统一内存处理显存溢出
+     - 避免 OOM（Out of Memory）错误
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+  效果: 7B 模型可以在 24GB 显存的 GPU 上微调
+""")
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+# ============================================================
+# 3. 模拟 NF4 量化
+# ============================================================
+print("3. 模拟 NF4 量化过程")
+print("-" * 40)
+
+def simulate_nf4_quantize(tensor, group_size=64):
+    """
+    模拟 NF4 量化过程（简化版）
+    实际实现使用 bitsandbytes 库
+    """
+    # 1. 分组
+    flat = tensor.flatten()
+    n_groups = (flat.numel() + group_size - 1) // group_size
+
+    # 2. 每组独立量化到 4-bit（16 个量化级别）
+    quantized = []
+    scales = []
+    for i in range(n_groups):
+        group = flat[i * group_size: (i + 1) * group_size]
+        max_val = group.abs().max()
+        scale = max_val / 7.0  # 4-bit 有 16 个级别 [-8, 7]
+        quantized_group = torch.clamp(torch.round(group / scale), -8, 7).to(torch.int8)
+        quantized.append(quantized_group)
+        scales.append(scale)
+
+    return quantized, scales
+
+# 测试量化
+original = torch.randn(256)
+quantized_groups, scales = simulate_nf4_quantize(original)
+
+# 计算压缩率
+original_bits = original.numel() * 16  # FP16
+quantized_bits = original.numel() * 4 + len(scales) * 16  # 4-bit + scale
+compression = original_bits / quantized_bits
+
+print(f"  原始大小: {original_bits / 8:.0f} bytes (FP16)")
+print(f"  量化后大小: ~{quantized_bits / 8:.0f} bytes (NF4)")
+print(f"  压缩比: {compression:.2f}x")
+
+# ============================================================
+# 4. 显存节省计算
+# ============================================================
+print("\n4. 显存节省计算（以 7B 模型为例）")
+print("-" * 40)
+
+params_7b = 7e9
+print(f"  7B 模型参数量: {params_7b:.0e}")
+print(f"  FP16 训练: {params_7b * 2 / 1e9:.1f} GB (仅模型权重)")
+print(f"  FP16 + Adam: {params_7b * (2 + 8) / 1e9:.1f} GB (模型 + 优化器)")
+print(f"  QLoRA (NF4 + FP16 LoRA): ~{params_7b * 0.5 / 1e9 + 0.5:.1f} GB (4-bit 基座 + FP16 LoRA)")
+print(f"  节省: ~{(params_7b * 10 / 1e9) - (params_7b * 0.5 / 1e9 + 0.5):.1f} GB")
+```
+
+### 代码 3：使用 PEFT 库配置 LoRA
+
+```python
+"""
+Day 2 - 使用 Hugging Face PEFT 库配置 LoRA
+实际工程中最常用的 LoRA 配置方式
+"""
+
+from peft import (
+    LoraConfig,
+    get_peft_model,
+    TaskType,
+    prepare_model_for_kbit_training,
+)
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+)
+
+print("=" * 60)
+print("使用 PEFT 库配置 LoRA")
+print("=" * 60)
+
+# ============================================================
+# 1. LoRA 配置参数详解
+# ============================================================
+print("\n1. LoRA 配置参数详解")
+print("-" * 40)
+
+lora_config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,   # 因果语言模型任务
+    r=8,                             # 秩（rank），越大越强但参数越多
+    lora_alpha=32,                   # 缩放因子，通常 = 2 * r
+    lora_dropout=0.1,                # LoRA 层的 dropout
+    target_modules=[                 # 应用 LoRA 的层
+        "q_proj",                    # Query 投影
+        "v_proj",                    # Value 投影
+        # "k_proj",                  # Key 投影（可选）
+        # "o_proj",                  # Output 投影（可选）
+        # "gate_proj",              # FFN 门控（可选）
+        # "up_proj",                # FFN 上投影（可选）
+        # "down_proj",              # FFN 下投影（可选）
+    ],
+    bias="none",                     # 不训练 bias
+    modules_to_save=None,            # 额外需要训练的模块
+)
+
+print(f"  任务类型: {lora_config.task_type}")
+print(f"  秩 (r): {lora_config.r}")
+print(f"  缩放因子 (alpha): {lora_config.lora_alpha}")
+print(f"  Dropout: {lora_config.lora_dropout}")
+print(f"  目标模块: {lora_config.target_modules}")
+print(f"  Bias: {lora_config.bias}")
+
+# ============================================================
+# 2. 常见 LoRA 配置方案
+# ============================================================
+print("\n2. 常见 LoRA 配置方案")
+print("-" * 40)
+
+configs = {
+    "最小配置（推荐入门）": {
+        "r": 8, "alpha": 16,
+        "targets": ["q_proj", "v_proj"],
+        "desc": "参数最少，效果够用"
+    },
+    "标准配置": {
+        "r": 16, "alpha": 32,
+        "targets": ["q_proj", "k_proj", "v_proj", "o_proj"],
+        "desc": "全注意力层，效果好"
+    },
+    "高精度配置": {
+        "r": 64, "alpha": 128,
+        "targets": ["q_proj", "k_proj", "v_proj", "o_proj",
+                     "gate_proj", "up_proj", "down_proj"],
+        "desc": "全层 LoRA，效果最好但参数多"
+    },
+}
+
+for name, cfg in configs.items():
+    print(f"  {name}:")
+    print(f"    r={cfg['r']}, alpha={cfg['alpha']}")
+    print(f"    目标模块: {cfg['targets']}")
+    print(f"    说明: {cfg['desc']}")
+    print()
+
+# ============================================================
+# 3. QLoRA 配置（4-bit 量化 + LoRA）
+# ============================================================
+print("3. QLoRA 配置（4-bit 量化 + LoRA）")
+print("-" * 40)
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,                    # 4-bit 量化加载
+    bnb_4bit_quant_type="nf4",            # NF4 量化类型
+    bnb_4bit_compute_dtype="float16",     # 计算精度
+    bnb_4bit_use_double_quant=True,       # 双重量化
+)
+
+print(f"  量化类型: {bnb_config.bnb_4bit_quant_type}")
+print(f"  计算精度: {bnb_config.bnb_4bit_compute_dtype}")
+print(f"  双重量化: {bnb_config.bnb_4bit_use_double_quant}")
+print()
+
+# ============================================================
+# 4. 完整的 QLoRA + SFT 配置示例
+# ============================================================
+print("4. 完整的 QLoRA + SFT 配置示例")
+print("-" * 40)
+
+code_example = '''
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from trl import SFTTrainer, SFTConfig
+
+# 1. 量化配置
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype="float16",
+    bnb_4bit_use_double_quant=True,
+)
+
+# 2. 加载量化模型
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen2-7B",
+    quantization_config=bnb_config,
+    device_map="auto",
+)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-7B")
+
+# 3. 准备量化训练
+model = prepare_model_for_kbit_training(model)
+
+# 4. LoRA 配置
+lora_config = LoraConfig(
+    r=16, lora_alpha=32,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+)
+
+# 5. 应用 LoRA
+model = get_peft_model(model, lora_config)
+model.print_trainable_parameters()
+
+# 6. 训练
+training_args = SFTConfig(
+    output_dir="./output",
+    num_train_epochs=3,
+    per_device_train_batch_size=4,
+    learning_rate=2e-4,
+    fp16=True,
+)
+
+trainer = SFTTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset,
+    processing_class=tokenizer,
+)
+trainer.train()
+'''
+print(code_example)
+
+# ============================================================
+# 5. 为什么微调小模型
+# ============================================================
+print("5. 为什么微调小模型（0.5B-3B）")
+print("-" * 40)
+print("""
+  小模型微调的优势：
+  ─────────────────────
+  1. 推理速度快: 0.5B 模型推理速度是 70B 的 100+ 倍
+  2. 部署成本低: 可以在消费级 GPU 甚至 CPU 上运行
+  3. 适合嵌入式: 可以部署到手机、边缘设备
+  4. 数据需求少: 小模型过拟合风险更低
+  5. 迭代更快: 训练时间短，方便快速实验
+
+  小模型微调的适用场景：
+  ─────────────────────
+  - 特定领域的问答系统
+  - 简单的指令遵循任务
+  - 分类、提取等结构化任务
+  - 需要低延迟的在线服务
+  - 数据量有限的垂直领域
+
+  不适合的场景：
+  ─────────────────────
+  - 需要复杂推理的任务
+  - 需要广泛知识的任务
+  - 多语言、多任务场景
+""")
+```
+
+---
+
+## 📤 预期输出
+
+```
+============================================================
+LoRA 数学原理与手动实现
+============================================================
+
+1. LoRA 参数量对比
+----------------------------------------
+  原始矩阵 W: 4096 x 4096 = 16,777,216 参数
+  LoRA 矩阵 A: 8 x 4096 = 32,768 参数
+  LoRA 矩阵 B: 4096 x 8 = 32,768 参数
+  LoRA 总参数: 65,536
+  参数比例: 0.39%
+
+2. 不同 rank 的参数量对比
+----------------------------------------
+  rank= 4:     32,768 参数 (0.20%)
+  rank= 8:     65,536 参数 (0.39%)
+  rank=16:    131,072 参数 (0.78%)
+  rank=32:    262,144 参数 (1.56%)
+  rank=64:    524,288 参数 (3.13%)
+
+============================================================
+QLoRA 原理与 4-bit 量化
+============================================================
+
+1. 不同精度的显存占用
+----------------------------------------
+  0.5B 模型: FP32=   2000MB, FP16=   1000MB, INT8=    500MB, INT4=    250MB
+     1B 模型: FP32=   4000MB, FP16=   2000MB, INT8=   1000MB, INT4=    500MB
+     3B 模型: FP32=  12000MB, FP16=   6000MB, INT8=   3000MB, INT4=   1500MB
+     7B 模型: FP32=  28000MB, FP16=  14000MB, INT8=   7000MB, INT4=   3500MB
+    13B 模型: FP32=  52000MB, FP16=  26000MB, INT8=  13000MB, INT4=   6500MB
+```
+
+---
+
+## ⚠️ 常见错误和解决方案
+
+### 错误 1：bitsandbytes 在 Windows 上不支持
+```
+NotImplementedError: 8-bit and 4-bit quantization is not supported on CPU
+```
+**解决方案：**
+- QLoRA 需要 NVIDIA GPU（CUDA）
+- Windows 上可使用 WSL2 + CUDA
+- 或使用 `pip install bitsandbytes-windows`（社区维护版本）
+
+### 错误 2：LoRA 微调后模型效果变差
+**解决方案：**
+- 增大 rank（从 8 → 16 → 32）
+- 添加更多目标模块（如 k_proj, o_proj）
+- 检查学习率是否合适（QLoRA 通常用 1e-4 到 3e-4）
+- 确保数据质量足够好
+
+### 错误 3：target_modules 名称不匹配
+```
+ValueError: Target modules not found in model
+```
+**解决方案：**
+- 查看模型结构：`print(model.named_modules())`
+- 确认层名称是否正确（不同模型命名不同）
+- 使用 `target_modules="all"` 匹配所有线性层
+
+### 错误 4：训练时 loss 为 NaN
+**解决方案：**
+- 降低学习率
+- 检查数据中是否有异常值
+- 使用更稳定的优化器（如 paged_adamw_8bit）
+- 确保 `bnb_4bit_compute_dtype` 设置正确
+
+---
+
+## 🏋️ 每日挑战
+
+1. **计算挑战**：一个 7B 模型（d=4096, 隐藏层=32），使用 rank=16 的 LoRA 应用到 q_proj 和 v_proj，计算 LoRA 参数占总参数的比例。
+
+2. **对比实验**：分别用 rank=4, 8, 16, 32 配置 LoRA，在同一数据集上微调，比较训练时间和最终效果。
+
+3. **思考题**：为什么 LoRA 的 B 矩阵初始化为零，而 A 矩阵用随机初始化？如果反过来会怎样？

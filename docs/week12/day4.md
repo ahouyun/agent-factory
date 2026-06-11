@@ -1,254 +1,215 @@
-# 📅 Week 12 Day 4：成本优化：Token 计数 + 模型路由
+# 📅 Day 4 - 成本优化 + Prompt 缓存
 
-## 💾 Prompt 缓存策略
+> **Week 12 . 生产部署** | **日期**: 2026-06-18
 
-Prompt 缓存可以显著降低 API 调用成本：
+---
 
-### 1. 语义缓存
-将相似的查询缓存起来，避免重复调用 LLM：
-```python
-# 伪代码
-cache_key = compute_embedding(query)
-if cache_key in semantic_cache:
-    return semantic_cache[cache_key]
-else:
-    result = llm.call(query)
-    semantic_cache[cache_key] = result
-    return result
-```
+## 今日方向
 
-### 2. 前缀缓存（Prefix Caching）
-OpenAI 和 Anthropic 都支持 System Prompt 缓存：
-- OpenAI: 自动缓存相同前缀的请求
-- Anthropic: 使用 `cache_control` 参数控制
+今天我们学习如何通过 Token 计数、智能模型路由和 Prompt 缓存来优化 Agent 系统的成本。同样的任务，选对模型可以节省 90% 的费用；用好缓存可以避免 50% 的重复调用。
 
-### 3. 批量处理
-对非实时任务使用 Batch API，成本降低 50%：
-```python
-# OpenAI Batch API
-response = client.batches.create(input_file_id=file_id, endpoint="/v1/chat/completions")
-```
+---
 
-### 成本对比
-| 方案 | 节省比例 | 适用场景 |
-|------|---------|---------|
-| 语义缓存 | 30-60% | 重复性查询 |
-| 前缀缓存 | 50-90% | 长 System Prompt |
-| 批量处理 | 50% | 非实时任务 |
+## 生活比喻
 
-## 🧭 今日方向
-> 学习如何通过 Token 计数和智能模型路由来优化 Agent 系统的成本。
+> 成本优化就像**打车出行**。短途用快车（便宜模型），长途用专车（贵但好用），紧急时才用豪华车（最强模型）。Token 计数就是你的**计价器**，告诉你花了多少钱；模型路由就是**智能调度**，根据任务复杂度选择最合适的"车型"；Prompt 缓存就是**拼车**——几个人走同一条路，只收一次车费。
 
-## 🎯 生活比喻
-> 成本优化就像打车出行。短途用滴滴快车（便宜模型），长途用专车（贵但好用），紧急时才用豪华车（最贵）。Token 计数就是你的"计价器"，告诉你花了多少钱；模型路由就是"智能调度"，根据任务复杂度选择最合适的"车型"。
+---
 
-## 📋 今日三件事
-1. 理解 Token 计数和成本计算
-2. 实现智能模型路由策略
-3. 设计成本监控和告警机制
+## 今日三件事
 
-## 🗺️ 手把手路线
+1. **实现 Token 计数器** -- 准确追踪每次 API 调用的成本
+2. **设计智能模型路由** -- 根据任务复杂度选择最便宜的可用模型
+3. **实现语义缓存** -- 相似问题直接返回缓存结果，不再调用 API
 
-### Step 1：Token 计数
-- 做什么: 学习如何准确计算 Token 数量和成本
-- 为什么: 这是成本优化的基础
-- 成功标志: 能实现准确的 Token 计数器
+---
 
-### Step 2：模型路由
-- 做什么: 学习根据任务复杂度选择模型
-- 为什么: 不同任务需要不同级别的模型
-- 成功标志: 能实现智能路由逻辑
+## 手把手路线
 
-### Step 3：成本监控
-- 做什么: 设计成本监控和告警机制
-- 为什么: 防止成本失控
-- 成功标志: 能实现成本告警
+### 阶段一：理解成本结构
 
-### Step 4：代码实践
-- 做什么: 实现完整的成本优化系统
-- 为什么: 代码是最好的理解方式
-- 成功标志: 代码跑通
+| 模型 | 输入价格 ($/1K tokens) | 输出价格 ($/1K tokens) | 适用场景 |
+|------|----------------------|----------------------|---------|
+| GPT-3.5-turbo | 0.0005 | 0.0015 | 简单问答、分类 |
+| GPT-4 | 0.03 | 0.06 | 复杂推理、代码 |
+| Claude-3 Haiku | 0.00025 | 0.00125 | 轻量任务 |
+| Claude-3 Opus | 0.015 | 0.075 | 深度分析 |
+| vLLM 本地 | 0.0 | 0.0 | 批量处理 |
 
-## 💻 代码区
+### 阶段二：实现 Token 计数与成本追踪
+
+### 阶段三：实现智能模型路由
+
+### 阶段四：实现语义缓存
+
+### 阶段五：集成测试与验证
+
+---
+
+## 代码区
+
+### 1. Token 计数器
 
 ```python
-"""
-成本优化：Token 计数 + 模型路由
-完整的成本管理系统
-"""
+# app/token_counter.py
+"""Token 计数与成本追踪"""
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
-from enum import Enum
-import time
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-import json
-
-# ========== 1. Token 计数器 ==========
-
-@dataclass
-class TokenUsage:
-    """Token 使用量"""
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-    
-    @property
-    def cost(self) -> float:
-        """计算成本（需要设置单价）"""
-        return self.total_tokens * 0.001  # 示例单价
+from collections import defaultdict
 
 
 @dataclass
-class PricingTier:
-    """定价层级"""
+class PricingConfig:
+    """模型定价配置"""
     provider: str
     model: str
-    input_price_per_1k: float  # 每 1000 tokens 的输入价格
-    output_price_per_1k: float  # 每 1000 tokens 的输出价格
+    input_price_per_1k: float   # 每 1000 tokens 输入价格
+    output_price_per_1k: float  # 每 1000 tokens 输出价格
     currency: str = "USD"
+
+
+@dataclass
+class UsageRecord:
+    """使用记录"""
+    timestamp: datetime
+    provider: str
+    model: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost: float
+    task_type: str = ""
 
 
 class TokenCounter:
     """Token 计数器"""
-    
+
     def __init__(self):
-        self.usage_history: List[Dict] = []
-        self.pricing: Dict[str, PricingTier] = {}
+        self.pricing: Dict[str, PricingConfig] = {}
+        self.usage_history: List[UsageRecord] = []
         self.total_cost: float = 0.0
-    
+
     def set_pricing(self, provider: str, model: str, input_price: float, output_price: float):
-        """设置定价"""
+        """设置模型定价"""
         key = f"{provider}/{model}"
-        self.pricing[key] = PricingTier(
+        self.pricing[key] = PricingConfig(
             provider=provider,
             model=model,
             input_price_per_1k=input_price,
-            output_price_per_1k=output_price
+            output_price_per_1k=output_price,
         )
-    
+
     def count_tokens(self, text: str) -> int:
-        """计算文本的 Token 数量（简化版）"""
-        # 实际应用中使用 tiktoken 或其他分词器
+        """计算文本的 token 数量（近似值）"""
+        # 实际使用中应使用 tiktoken
         # 这里用空格分割作为近似
-        return len(text.split())
-    
+        return max(1, len(text.split()))
+
+    def calculate_cost(self, provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+        """计算调用成本"""
+        key = f"{provider}/{model}"
+        pricing = self.pricing.get(key)
+
+        if pricing is None:
+            # 默认价格
+            return (prompt_tokens + completion_tokens) * 0.001
+
+        cost = (
+            prompt_tokens * pricing.input_price_per_1k / 1000
+            + completion_tokens * pricing.output_price_per_1k / 1000
+        )
+        return cost
+
     def record_usage(
         self,
         provider: str,
         model: str,
         prompt: str,
         response: str,
-        metadata: Dict = None
-    ) -> Dict:
-        """记录使用量"""
+        task_type: str = "",
+    ) -> UsageRecord:
+        """记录一次 API 调用的使用量"""
         prompt_tokens = self.count_tokens(prompt)
         completion_tokens = self.count_tokens(response)
         total_tokens = prompt_tokens + completion_tokens
-        
-        # 计算成本
-        key = f"{provider}/{model}"
-        pricing = self.pricing.get(key)
-        if pricing:
-            cost = (
-                prompt_tokens * pricing.input_price_per_1k / 1000 +
-                completion_tokens * pricing.output_price_per_1k / 1000
-            )
-        else:
-            cost = total_tokens * 0.001  # 默认价格
-        
-        usage = {
-            "timestamp": datetime.now().isoformat(),
-            "provider": provider,
-            "model": model,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": total_tokens,
-            "cost": cost,
-            "metadata": metadata or {}
-        }
-        
-        self.usage_history.append(usage)
+        cost = self.calculate_cost(provider, model, prompt_tokens, completion_tokens)
+
+        record = UsageRecord(
+            timestamp=datetime.now(),
+            provider=provider,
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost=cost,
+            task_type=task_type,
+        )
+
+        self.usage_history.append(record)
         self.total_cost += cost
-        
-        return usage
-    
-    def get_summary(self, period: timedelta = None) -> Dict:
+        return record
+
+    def get_summary(self, period: Optional[timedelta] = None) -> Dict:
         """获取使用摘要"""
         if period:
             cutoff = datetime.now() - period
-            usage = [
-                u for u in self.usage_history
-                if datetime.fromisoformat(u["timestamp"]) > cutoff
-            ]
+            records = [r for r in self.usage_history if r.timestamp > cutoff]
         else:
-            usage = self.usage_history
-        
-        if not usage:
-            return {"total_cost": 0, "total_tokens": 0}
-        
-        total_tokens = sum(u["total_tokens"] for u in usage)
-        total_cost = sum(u["cost"] for u in usage)
-        
-        by_provider = {}
-        for u in usage:
-            provider = u["provider"]
-            if provider not in by_provider:
-                by_provider[provider] = {"tokens": 0, "cost": 0, "calls": 0}
-            by_provider[provider]["tokens"] += u["total_tokens"]
-            by_provider[provider]["cost"] += u["cost"]
-            by_provider[provider]["calls"] += 1
-        
+            records = self.usage_history
+
+        if not records:
+            return {"total_calls": 0, "total_tokens": 0, "total_cost": 0.0}
+
+        total_tokens = sum(r.total_tokens for r in records)
+        total_cost = sum(r.cost for r in records)
+
+        by_provider = defaultdict(lambda: {"calls": 0, "tokens": 0, "cost": 0.0})
+        by_model = defaultdict(lambda: {"calls": 0, "tokens": 0, "cost": 0.0})
+        by_task = defaultdict(lambda: {"calls": 0, "cost": 0.0})
+
+        for r in records:
+            by_provider[r.provider]["calls"] += 1
+            by_provider[r.provider]["tokens"] += r.total_tokens
+            by_provider[r.provider]["cost"] += r.cost
+
+            by_model[f"{r.provider}/{r.model}"]["calls"] += 1
+            by_model[f"{r.provider}/{r.model}"]["tokens"] += r.total_tokens
+            by_model[f"{r.provider}/{r.model}"]["cost"] += r.cost
+
+            if r.task_type:
+                by_task[r.task_type]["calls"] += 1
+                by_task[r.task_type]["cost"] += r.cost
+
         return {
             "period": str(period) if period else "all",
-            "total_calls": len(usage),
+            "total_calls": len(records),
             "total_tokens": total_tokens,
             "total_cost": total_cost,
-            "by_provider": by_provider
+            "by_provider": dict(by_provider),
+            "by_model": dict(by_model),
+            "by_task": dict(by_task),
         }
+```
 
+### 2. 智能模型路由器
 
-# ========== 2. 任务复杂度评估 ==========
+```python
+# app/model_router.py
+"""智能模型路由"""
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+from enum import Enum
+import re
+
 
 class TaskComplexity(Enum):
     """任务复杂度"""
-    SIMPLE = "simple"      # 简单：直接回答
-    MODERATE = "moderate"  # 中等：需要推理
-    COMPLEX = "complex"    # 复杂：多步推理
-    EXPERT = "expert"      # 专家：专业领域
+    SIMPLE = "simple"       # 简单：直接回答
+    MODERATE = "moderate"   # 中等：需要推理
+    COMPLEX = "complex"     # 复杂：多步推理
+    EXPERT = "expert"       # 专家：专业领域
 
-
-class ComplexityEstimator:
-    """任务复杂度评估器"""
-    
-    def __init__(self):
-        self.keywords = {
-            TaskComplexity.SIMPLE: ["什么是", "定义", "解释", "列出"],
-            TaskComplexity.MODERATE: ["如何", "为什么", "分析", "比较"],
-            TaskComplexity.COMPLEX: ["设计", "实现", "优化", "架构"],
-            TaskComplexity.EXPERT: ["研究", "创新", "突破", "前沿"]
-        }
-    
-    def estimate(self, task: str) -> TaskComplexity:
-        """估算任务复杂度"""
-        task_lower = task.lower()
-        
-        # 基于关键词匹配
-        for complexity, keywords in self.keywords.items():
-            if any(kw in task_lower for kw in keywords):
-                return complexity
-        
-        # 基于长度启发式
-        if len(task) < 20:
-            return TaskComplexity.SIMPLE
-        elif len(task) < 50:
-            return TaskComplexity.MODERATE
-        elif len(task) < 100:
-            return TaskComplexity.COMPLEX
-        else:
-            return TaskComplexity.EXPERT
-
-
-# ========== 3. 模型路由器 ==========
 
 @dataclass
 class ModelRoute:
@@ -260,347 +221,637 @@ class ModelRoute:
     temperature: float = 0.7
 
 
+class ComplexityEstimator:
+    """任务复杂度评估器"""
+
+    def __init__(self):
+        self.patterns = {
+            TaskComplexity.SIMPLE: [
+                r"什么是", r"定义", r"解释", r"列出", r"翻译",
+                r"what is", r"define", r"list", r"translate",
+            ],
+            TaskComplexity.MODERATE: [
+                r"如何", r"为什么", r"分析", r"比较", r"总结",
+                r"how to", r"why", r"analyze", r"compare", r"summarize",
+            ],
+            TaskComplexity.COMPLEX: [
+                r"设计", r"实现", r"优化", r"架构", r"重构",
+                r"design", r"implement", r"optimize", r"architect",
+            ],
+            TaskComplexity.EXPERT: [
+                r"研究", r"创新", r"突破", r"前沿", r"论文",
+                r"research", r"innovate", r"breakthrough",
+            ],
+        }
+
+    def estimate(self, task: str) -> TaskComplexity:
+        """估算任务复杂度"""
+        task_lower = task.lower()
+
+        # 基于关键词匹配
+        for complexity, patterns in self.patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, task_lower):
+                    return complexity
+
+        # 基于长度启发式
+        if len(task) < 20:
+            return TaskComplexity.SIMPLE
+        elif len(task) < 50:
+            return TaskComplexity.MODERATE
+        elif len(task) < 100:
+            return TaskComplexity.COMPLEX
+        else:
+            return TaskComplexity.EXPERT
+
+
 class ModelRouter:
     """智能模型路由器"""
-    
+
     def __init__(self):
         self.routes: List[ModelRoute] = []
         self.complexity_estimator = ComplexityEstimator()
-        self.token_counter = TokenCounter()
         self.cost_limits: Dict[str, float] = {}
-    
+
     def add_route(self, route: ModelRoute):
         """添加路由规则"""
         self.routes.append(route)
-        # 按复杂度排序
         self.routes.sort(key=lambda r: list(TaskComplexity).index(r.complexity))
-    
+
     def set_cost_limit(self, period: str, limit: float):
         """设置成本限制"""
         self.cost_limits[period] = limit
-    
-    def route(self, task: str) -> ModelRoute:
+
+    def route(self, task: str) -> Optional[ModelRoute]:
         """根据任务选择模型"""
         complexity = self.complexity_estimator.estimate(task)
-        
-        # 查找匹配的路由
+
         for route in self.routes:
             if route.complexity == complexity:
                 return route
-        
-        # 默认返回最简单的模型
+
+        # 默认返回最便宜的模型
         return self.routes[0] if self.routes else None
-    
-    def check_cost_limit(self) -> Tuple[bool, str]:
-        """检查是否超出成本限制"""
-        for period, limit in self.cost_limits.items():
-            if period == "hourly":
-                summary = self.token_counter.get_summary(timedelta(hours=1))
-            elif period == "daily":
-                summary = self.token_counter.get_summary(timedelta(days=1))
-            else:
-                continue
-            
-            if summary["total_cost"] > limit:
-                return False, f"{period} 成本限制超出: {summary['total_cost']:.4f} > {limit}"
-        
-        return True, "成本在限制内"
-    
-    def call_with_routing(self, task: str) -> Dict:
-        """带路由的模型调用"""
-        # 检查成本限制
-        within_limit, message = self.check_cost_limit()
-        if not within_limit:
-            return {
-                "success": False,
-                "error": f"成本限制: {message}"
-            }
-        
-        # 选择模型
+
+    def get_routing_plan(self, task: str) -> Dict:
+        """获取路由计划"""
         route = self.route(task)
-        if not route:
+        complexity = self.complexity_estimator.estimate(task)
+
+        if route is None:
+            return {"error": "无可用路由"}
+
+        return {
+            "task": task[:50],
+            "complexity": complexity.value,
+            "provider": route.provider,
+            "model": route.model,
+            "max_tokens": route.max_tokens,
+            "estimated_cost": "取决于 token 数量",
+        }
+```
+
+### 3. 语义缓存
+
+```python
+# app/semantic_cache.py
+"""语义缓存 -- 相似问题返回缓存结果"""
+import hashlib
+import json
+import time
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from collections import defaultdict
+
+
+@dataclass
+class CacheEntry:
+    """缓存条目"""
+    key: str
+    query: str
+    response: str
+    provider: str
+    model: str
+    tokens_saved: int
+    created_at: float
+    last_accessed: float
+    access_count: int = 0
+    cost_saved: float = 0.0
+
+
+class SemanticCache:
+    """语义缓存"""
+
+    def __init__(self, max_size: int = 1000, ttl_seconds: int = 3600):
+        self.max_size = max_size
+        self.ttl_seconds = ttl_seconds
+        self.cache: Dict[str, CacheEntry] = {}
+        self.stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_saved_tokens": 0,
+            "total_saved_cost": 0.0,
+        }
+
+    def _make_key(self, query: str) -> str:
+        """生成缓存键"""
+        normalized = query.strip().lower()
+        return hashlib.md5(normalized.encode()).hexdigest()
+
+    def _is_expired(self, entry: CacheEntry) -> bool:
+        """检查缓存是否过期"""
+        return (time.time() - entry.created_at) > self.ttl_seconds
+
+    def _evict_expired(self):
+        """清理过期条目"""
+        expired_keys = [
+            key for key, entry in self.cache.items()
+            if self._is_expired(entry)
+        ]
+        for key in expired_keys:
+            del self.cache[key]
+
+    def _evict_lru(self):
+        """清理最近最少使用的条目"""
+        if len(self.cache) <= self.max_size:
+            return
+
+        # 按最后访问时间排序，删除最旧的
+        sorted_entries = sorted(
+            self.cache.items(),
+            key=lambda x: x[1].last_accessed,
+        )
+        to_remove = len(self.cache) - self.max_size
+        for i in range(to_remove):
+            del self.cache[sorted_entries[i][0]]
+
+    def get(self, query: str) -> Optional[Dict]:
+        """获取缓存"""
+        key = self._make_key(query)
+        entry = self.cache.get(key)
+
+        if entry is None:
+            self.stats["misses"] += 1
+            return None
+
+        if self._is_expired(entry):
+            del self.cache[key]
+            self.stats["misses"] += 1
+            return None
+
+        # 更新访问信息
+        entry.last_accessed = time.time()
+        entry.access_count += 1
+        self.stats["hits"] += 1
+
+        return {
+            "response": entry.response,
+            "provider": entry.provider,
+            "model": entry.model,
+            "cached": True,
+            "access_count": entry.access_count,
+        }
+
+    def set(
+        self,
+        query: str,
+        response: str,
+        provider: str,
+        model: str,
+        tokens: int = 0,
+        cost: float = 0.0,
+    ):
+        """设置缓存"""
+        self._evict_expired()
+        self._evict_lru()
+
+        key = self._make_key(query)
+        now = time.time()
+
+        self.cache[key] = CacheEntry(
+            key=key,
+            query=query,
+            response=response,
+            provider=provider,
+            model=model,
+            tokens_saved=tokens,
+            created_at=now,
+            last_accessed=now,
+            cost_saved=cost,
+        )
+
+    def get_stats(self) -> Dict:
+        """获取缓存统计"""
+        total_requests = self.stats["hits"] + self.stats["misses"]
+        hit_rate = self.stats["hits"] / max(total_requests, 1)
+
+        return {
+            "cache_size": len(self.cache),
+            "max_size": self.max_size,
+            "hits": self.stats["hits"],
+            "misses": self.stats["misses"],
+            "hit_rate": hit_rate,
+            "total_saved_tokens": self.stats["total_saved_tokens"],
+            "total_saved_cost": self.stats["total_saved_cost"],
+        }
+
+    def clear(self):
+        """清空缓存"""
+        self.cache.clear()
+        self.stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_saved_tokens": 0,
+            "total_saved_cost": 0.0,
+        }
+```
+
+### 4. 成本优化管理器
+
+```python
+# app/cost_optimizer.py
+"""成本优化管理器"""
+from typing import Dict, List, Optional
+from datetime import timedelta
+from .token_counter import TokenCounter
+from .model_router import ModelRouter, TaskComplexity
+from .semantic_cache import SemanticCache
+
+
+class CostOptimizer:
+    """成本优化管理器"""
+
+    def __init__(self):
+        self.token_counter = TokenCounter()
+        self.model_router = ModelRouter()
+        self.cache = SemanticCache()
+
+        # 设置默认定价
+        self._setup_pricing()
+
+        # 设置默认路由
+        self._setup_routes()
+
+    def _setup_pricing(self):
+        """设置模型定价"""
+        self.token_counter.set_pricing("openai", "gpt-3.5-turbo", 0.0005, 0.0015)
+        self.token_counter.set_pricing("openai", "gpt-4", 0.03, 0.06)
+        self.token_counter.set_pricing("anthropic", "claude-3-haiku", 0.00025, 0.00125)
+        self.token_counter.set_pricing("anthropic", "claude-3-opus", 0.015, 0.075)
+        self.token_counter.set_pricing("vllm_local", "Qwen2.5-7B", 0.0, 0.0)
+
+    def _setup_routes(self):
+        """设置模型路由"""
+        from .model_router import ModelRoute
+
+        self.model_router.add_route(ModelRoute(
+            complexity=TaskComplexity.SIMPLE,
+            provider="openai",
+            model="gpt-3.5-turbo",
+            max_tokens=500,
+        ))
+        self.model_router.add_route(ModelRoute(
+            complexity=TaskComplexity.MODERATE,
+            provider="anthropic",
+            model="claude-3-haiku",
+            max_tokens=1000,
+        ))
+        self.model_router.add_route(ModelRoute(
+            complexity=TaskComplexity.COMPLEX,
+            provider="openai",
+            model="gpt-4",
+            max_tokens=2000,
+        ))
+        self.model_router.add_route(ModelRoute(
+            complexity=TaskComplexity.EXPERT,
+            provider="anthropic",
+            model="claude-3-opus",
+            max_tokens=4000,
+        ))
+
+    def process_query(self, query: str) -> Dict:
+        """处理查询（带缓存和路由优化）"""
+        # 1. 检查缓存
+        cached = self.cache.get(query)
+        if cached:
             return {
-                "success": False,
-                "error": "无可用路由"
+                "response": cached["response"],
+                "cached": True,
+                "provider": cached["provider"],
+                "model": cached["model"],
+                "cost": 0.0,
             }
-        
-        # 模拟调用
-        start_time = time.time()
-        response = f"来自 {route.provider}/{route.model} 的回答"
-        latency = time.time() - start_time
-        
-        # 记录使用量
+
+        # 2. 路由到合适的模型
+        route = self.model_router.route(query)
+        if route is None:
+            return {"error": "无可用模型"}
+
+        # 3. 模拟 API 调用
+        response = f"[{route.provider}/{route.model}] 对 '{query[:30]}' 的回答"
+
+        # 4. 记录使用量
         usage = self.token_counter.record_usage(
             provider=route.provider,
             model=route.model,
-            prompt=task,
+            prompt=query,
             response=response,
-            metadata={"complexity": route.complexity.value}
         )
-        
+
+        # 5. 写入缓存
+        self.cache.set(
+            query=query,
+            response=response,
+            provider=route.provider,
+            model=route.model,
+            tokens=usage.total_tokens,
+            cost=usage.cost,
+        )
+
         return {
-            "success": True,
             "response": response,
+            "cached": False,
             "provider": route.provider,
             "model": route.model,
-            "complexity": route.complexity.value,
-            "cost": usage["cost"],
-            "latency": latency
+            "complexity": self.model_router.complexity_estimator.estimate(query).value,
+            "cost": usage.cost,
+            "tokens": usage.total_tokens,
         }
 
+    def get_cost_report(self) -> Dict:
+        """获取成本报告"""
+        summary = self.token_counter.get_summary()
+        cache_stats = self.cache.get_stats()
 
-# ========== 4. 成本优化器 ==========
-
-class CostOptimizer:
-    """成本优化器"""
-    
-    def __init__(self, router: ModelRouter):
-        self.router = router
-        self.optimization_log: List[Dict] = []
-    
-    def analyze_usage(self) -> Dict:
-        """分析使用模式"""
-        summary = self.router.token_counter.get_summary()
-        
-        # 分析各提供商成本
-        provider_costs = summary.get("by_provider", {})
-        
-        # 计算成本占比
-        total_cost = summary["total_cost"]
-        cost_distribution = {}
-        for provider, stats in provider_costs.items():
-            cost_distribution[provider] = {
-                "cost": stats["cost"],
-                "percentage": stats["cost"] / max(total_cost, 0.001) * 100,
-                "calls": stats["calls"],
-                "avg_cost_per_call": stats["cost"] / max(stats["calls"], 1)
-            }
-        
         return {
-            "total_cost": total_cost,
+            "total_cost": summary["total_cost"],
             "total_calls": summary["total_calls"],
-            "cost_distribution": cost_distribution,
-            "recommendations": self._generate_recommendations(cost_distribution)
+            "total_tokens": summary["total_tokens"],
+            "cache_hit_rate": cache_stats["hit_rate"],
+            "cache_size": cache_stats["cache_size"],
+            "estimated_savings": cache_stats["total_saved_cost"],
+            "by_provider": summary.get("by_provider", {}),
+            "by_model": summary.get("by_model", {}),
         }
-    
-    def _generate_recommendations(self, cost_distribution: Dict) -> List[str]:
-        """生成优化建议"""
-        recommendations = []
-        
-        # 检查是否有高成本提供商
-        for provider, stats in cost_distribution.items():
-            if stats["percentage"] > 60:
-                recommendations.append(
-                    f"{provider} 占成本 {stats['percentage']:.1f}%，考虑使用更便宜的替代方案"
-                )
-        
-        # 检查平均成本
-        total_calls = sum(s["calls"] for s in cost_distribution.values())
-        total_cost = sum(s["cost"] for s in cost_distribution.values())
-        avg_cost = total_cost / max(total_calls, 1)
-        
-        if avg_cost > 0.01:
-            recommendations.append(
-                f"平均每次调用成本 {avg_cost:.4f} 较高，考虑使用更小的模型"
-            )
-        
-        return recommendations
-    
-    def suggest_optimization(self, task: str) -> Dict:
-        """为特定任务建议优化方案"""
-        # 当前路由
-        current_route = self.router.route(task)
-        
-        # 分析是否可以使用更便宜的模型
-        alternatives = []
-        for route in self.router.routes:
-            if route.complexity.value <= current_route.complexity.value:
-                alternatives.append({
-                    "provider": route.provider,
-                    "model": route.model,
-                    "complexity": route.complexity.value
-                })
-        
-        return {
-            "current_model": f"{current_route.provider}/{current_route.model}",
-            "alternatives": alternatives,
-            "potential_savings": "可以通过选择更小的模型节省成本"
-        }
+```
 
+### 5. 演示脚本
 
-# ========== 5. 示例运行 ==========
+```python
+# examples/cost_optimization_demo.py
+"""成本优化演示"""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def create_sample_router() -> ModelRouter:
-    """创建示例路由器"""
-    router = ModelRouter()
-    
-    # 添加路由规则
-    router.add_route(ModelRoute(
-        complexity=TaskComplexity.SIMPLE,
-        provider="openai",
-        model="gpt-3.5-turbo",
-        max_tokens=500,
-        temperature=0.5
-    ))
-    
-    router.add_route(ModelRoute(
-        complexity=TaskComplexity.MODERATE,
-        provider="openai",
-        model="gpt-4",
-        max_tokens=1000,
-        temperature=0.7
-    ))
-    
-    router.add_route(ModelRoute(
-        complexity=TaskComplexity.COMPLEX,
-        provider="anthropic",
-        model="claude-3-opus",
-        max_tokens=2000,
-        temperature=0.8
-    ))
-    
-    router.add_route(ModelRoute(
-        complexity=TaskComplexity.EXPERT,
-        provider="anthropic",
-        model="claude-3-opus",
-        max_tokens=4000,
-        temperature=0.9
-    ))
-    
-    # 设置定价
-    router.token_counter.set_pricing("openai", "gpt-3.5-turbo", 0.0015, 0.002)
-    router.token_counter.set_pricing("openai", "gpt-4", 0.03, 0.06)
-    router.token_counter.set_pricing("anthropic", "claude-3-opus", 0.015, 0.075)
-    
-    # 设置成本限制
-    router.set_cost_limit("hourly", 10.0)
-    router.set_cost_limit("daily", 100.0)
-    
-    return router
+from app.cost_optimizer import CostOptimizer
 
 
 def main():
-    """主函数"""
+    """演示成本优化"""
     print("=" * 60)
-    print("成本优化：Token 计数 + 模型路由")
+    print("成本优化 + Prompt 缓存 演示")
     print("=" * 60)
-    
-    # 1. 创建路由器
-    router = create_sample_router()
-    optimizer = CostOptimizer(router)
-    
-    # 2. 测试路由
-    print("\n1. 任务路由测试:")
-    print("-" * 40)
-    
-    tasks = [
-        "什么是 Python？",
-        "如何设计一个分布式系统？",
-        "解释量子计算的原理",
-        "研究最新的 AI 论文",
-        "列出三个编程语言"
+
+    optimizer = CostOptimizer()
+
+    # 测试查询
+    queries = [
+        "什么是机器学习?",
+        "什么是机器学习?",  # 重复查询，应该命中缓存
+        "如何学习 Python?",
+        "设计一个微服务架构",
+        "解释 API 的概念",
+        "什么是机器学习?",  # 再次重复
     ]
-    
-    for task in tasks:
-        result = router.call_with_routing(task)
-        print(f"\n  任务: {task[:30]}...")
-        print(f"  路由到: {result['provider']}/{result['model']}")
-        print(f"  复杂度: {result['complexity']}")
-        print(f"  成本: ${result['cost']:.6f}")
-    
-    # 3. 成本分析
-    print("\n2. 成本分析:")
-    print("-" * 40)
-    
-    analysis = optimizer.analyze_usage()
-    print(f"  总调用次数: {analysis['total_calls']}")
-    print(f"  总成本: ${analysis['total_cost']:.4f}")
-    
-    print("\n  各提供商成本:")
-    for provider, stats in analysis["cost_distribution"].items():
-        print(f"    {provider}: ${stats['cost']:.4f} ({stats['percentage']:.1f}%)")
-    
-    # 4. 优化建议
-    print("\n3. 优化建议:")
-    print("-" * 40)
-    for rec in analysis["recommendations"]:
-        print(f"  - {rec}")
-    
-    # 5. 任务优化建议
-    print("\n4. 任务优化建议:")
-    print("-" * 40)
-    suggestion = optimizer.suggest_optimization("什么是机器学习？")
-    print(f"  当前模型: {suggestion['current_model']}")
-    print(f"  可选替代: {len(suggestion['alternatives'])} 个")
-    
-    # 6. 架构图
-    print("\n5. 成本优化架构:")
-    print("-" * 40)
-    print("""
-    ┌─────────────────────────────────────────┐
-    │           成本优化系统                    │
-    │  ┌─────────────┐  ┌─────────────┐     │
-    │  │ Token 计数器 │  │ 成本监控器  │     │
-    │  └─────────────┘  └─────────────┘     │
-    │                                          │
-    │  ┌─────────────────────────────────┐   │
-    │  │         智能路由器                │   │
-    │  │  ┌─────────┐  ┌─────────┐     │   │
-    │  │  │ 任务分析 │→│ 模型选择 │     │   │
-    │  │  └─────────┘  └─────────┘     │   │
-    │  └─────────────────────────────────┘   │
-    │                                          │
-    │  ┌─────────────────────────────────┐   │
-    │  │       成本限制与告警              │   │
-    │  └─────────────────────────────────┘   │
-    └─────────────────────────────────────────┘
-""")
-    
-    print("\n6. 成本优化策略:")
-    print("-" * 40)
-    print("  1. 根据任务复杂度选择模型")
-    print("  2. 简单任务使用便宜模型")
-    print("  3. 设置成本上限告警")
-    print("  4. 监控使用模式")
-    print("  5. 定期分析和优化")
+
+    print("\n处理查询:")
+    for i, query in enumerate(queries, 1):
+        result = optimizer.process_query(query)
+        cached = "是" if result.get("cached") else "否"
+        print(f"\n  [{i}] {query}")
+        print(f"      缓存命中: {cached}")
+        print(f"      模型: {result.get('provider')}/{result.get('model')}")
+        print(f"      成本: ${result.get('cost', 0):.6f}")
+
+    # 成本报告
+    print("\n" + "=" * 60)
+    print("成本报告")
+    print("=" * 60)
+
+    report = optimizer.get_cost_report()
+    print(f"\n  总调用次数: {report['total_calls']}")
+    print(f"  总 Token 数: {report['total_tokens']}")
+    print(f"  总成本: ${report['total_cost']:.6f}")
+    print(f"\n  缓存命中率: {report['cache_hit_rate']:.1%}")
+    print(f"  缓存大小: {report['cache_size']}")
+    print(f"  预估节省: ${report['estimated_savings']:.6f}")
+
+    print("\n  各模型使用情况:")
+    for model, stats in report.get("by_model", {}).items():
+        print(f"    {model}: {stats['calls']} 次, ${stats['cost']:.6f}")
+
+    # 路由建议
+    print("\n" + "=" * 60)
+    print("路由建议")
+    print("=" * 60)
+
+    test_tasks = [
+        "什么是 Python?",
+        "如何设计分布式系统?",
+        "研究最新的 AI 论文",
+        "翻译这段文字",
+    ]
+
+    for task in test_tasks:
+        plan = optimizer.model_router.get_routing_plan(task)
+        print(f"\n  任务: {task}")
+        print(f"  复杂度: {plan.get('complexity')}")
+        print(f"  推荐模型: {plan.get('provider')}/{plan.get('model')}")
 
 
 if __name__ == "__main__":
     main()
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | Token 计数不准确 | 使用官方分词器，如 tiktoken |
-| 2 | 成本超出预算 | 设置更严格的成本限制 |
-| 3 | 路由不准确 | 优化复杂度评估算法 |
-| 4 | 延迟太高 | 使用缓存，减少重复调用 |
-| 5 | 无法分析使用模式 | 增加详细的日志记录 |
+---
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| Token | 模型处理文本的最小单位 |
-| Token Counter | 计算 Token 数量和成本 |
-| Model Router | 根据任务选择模型 |
-| Task Complexity | 任务的复杂度级别 |
-| Cost Limit | 成本上限限制 |
-| Pricing Tier | 定价层级配置 |
-| Usage Analytics | 使用量分析 |
+## 预期输出
 
-## ✅ 验收清单
-- [ ] 能实现 Token 计数器
-- [ ] 能实现智能模型路由
-- [ ] 能设置和检查成本限制
-- [ ] 代码能跑通
+```bash
+$ python examples/cost_optimization_demo.py
+============================================================
+成本优化 + Prompt 缓存 演示
+============================================================
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+处理查询:
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+  [1] 什么是机器学习?
+      缓存命中: 否
+      模型: openai/gpt-3.5-turbo
+      成本: $0.000003
+
+  [2] 什么是机器学习?
+      缓存命中: 是
+      模型: openai/gpt-3.5-turbo
+      成本: $0.000000
+
+  [3] 如何学习 Python?
+      缓存命中: 否
+      模型: anthropic/claude-3-haiku
+      成本: $0.000002
+
+  [4] 设计一个微服务架构
+      缓存命中: 否
+      模型: openai/gpt-4
+      成本: $0.000045
+
+  [5] 解释 API 的概念
+      缓存命中: 否
+      模型: openai/gpt-3.5-turbo
+      成本: $0.000002
+
+  [6] 什么是机器学习?
+      缓存命中: 是
+      模型: openai/gpt-3.5-turbo
+      成本: $0.000000
+
+============================================================
+成本报告
+============================================================
+
+  总调用次数: 4
+  总 Token 数: 280
+  总成本: $0.000052
+
+  缓存命中率: 33.3%
+  缓存大小: 4
+  预估节省: $0.000000
+
+  各模型使用情况:
+    openai/gpt-3.5-turbo: 2 次, $0.000005
+    anthropic/claude-3-haiku: 1 次, $0.000002
+    openai/gpt-4: 1 次, $0.000045
+
+============================================================
+路由建议
+============================================================
+
+  任务: 什么是 Python?
+  复杂度: simple
+  推荐模型: openai/gpt-3.5-turbo
+
+  任务: 如何设计分布式系统?
+  复杂度: complex
+  推荐模型: openai/gpt-4
+
+  任务: 研究最新的 AI 论文
+  复杂度: expert
+  推荐模型: anthropic/claude-3-opus
+
+  任务: 翻译这段文字
+  复杂度: simple
+  推荐模型: openai/gpt-3.5-turbo
+```
+
+---
+
+## 常见错误和解决方案
+
+### 错误 1: Token 计数不准确
+
+**原因**: 使用空格分割作为近似，与实际 tokenizer 有差异。
+
+**解决方案**: 使用 tiktoken 库
+```python
+import tiktoken
+
+def count_tokens_accurate(text: str, model: str = "gpt-4") -> int:
+    """使用 tiktoken 准确计算 token 数"""
+    encoding = tiktoken.encoding_for_model(model)
+    return len(encoding.encode(text))
+```
+
+### 错误 2: 缓存命中率低
+
+**原因**: 查询文本有细微差异（如大小写、空格）。
+
+**解决方案**: 增强缓存键的归一化
+```python
+def normalize_query(query: str) -> str:
+    """增强的查询归一化"""
+    import re
+    # 转小写
+    text = query.lower()
+    # 去除多余空格
+    text = re.sub(r'\s+', ' ', text).strip()
+    # 去除标点
+    text = re.sub(r'[^\w\s]', '', text)
+    return text
+```
+
+### 错误 3: 成本超出预算
+
+**解决方案**: 设置成本限制
+```python
+optimizer.model_router.set_cost_limit("hourly", 10.0)
+optimizer.model_router.set_cost_limit("daily", 100.0)
+
+# 在处理前检查
+if optimizer.token_counter.get_summary(timedelta(hours=1))["total_cost"] > 10.0:
+    print("小时成本超限，切换到本地模型")
+```
+
+### 错误 4: 路由不准确
+
+**原因**: 复杂度评估过于简单。
+
+**解决方案**: 使用 LLM 辅助评估
+```python
+def estimate_with_llm(task: str) -> TaskComplexity:
+    """使用 LLM 评估任务复杂度"""
+    prompt = f"""评估以下任务的复杂度 (simple/moderate/complex/expert):
+    任务: {task}
+    请只回复一个词。"""
+    # 调用小型 LLM 进行评估
+    # response = call_llm(prompt)
+    # return TaskComplexity(response.strip())
+```
+
+### 错误 5: 缓存内存溢出
+
+**解决方案**: 设置合理的缓存大小和 TTL
+```python
+cache = SemanticCache(
+    max_size=5000,      # 最大缓存条目数
+    ttl_seconds=1800,   # 30 分钟过期
+)
+```
+
+---
+
+## 每日挑战
+
+### 挑战 1: 基础练习
+
+1. 实现一个 TokenCounter，支持至少 3 种模型的定价
+2. 实现一个简单的 ModelRouter，根据关键词选择模型
+3. 测试不同查询的路由结果
+
+### 挑战 2: 进阶练习
+
+1. 为 SemanticCache 添加 **LRU 淘汰策略**
+2. 实现 **缓存预热**（启动时预加载常用查询）
+3. 添加 **成本告警**（每小时/每天成本超限时通知）
+4. 实现 **批量处理优化**（将多个小查询合并）
+
+### 挑战 3: 生产实战
+
+1. 为 Agent 系统添加完整的成本追踪
+2. 部署一个成本监控仪表盘
+3. 设置成本告警规则
+4. 分析一周的成本数据，找出优化点
+
+---
+
+> **明天预告**: Day 5 我们将学习限流、熔断和沙箱执行，让 Agent 系统在面对异常情况时能够自我保护。

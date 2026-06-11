@@ -1,304 +1,536 @@
-# 📅 Week 0 Day 6：Python 数据结构 + 类型提示
+# Week 0 Day 6: Python 数据结构 + 类型提示
 
-## 🧭 今日方向
-> 今天我们将深入学习 Python 的高级数据结构和类型提示系统。掌握这些能让你的代码更专业、更易维护。
+> 今天我们将学习 Python 的进阶数据操作（推导式、f-string 高级用法）和类型提示系统。这些是写出现代、专业 Python 代码的关键技能。
 
-## 🎯 生活比喻
-> 如果说基础数据类型是积木，那么高级数据结构就是预制的组件。类型提示就像是给积木贴上标签，让别人一眼就知道这是什么、能做什么。
+---
 
-## 📋 今日三件事
-1. 掌握列表、字典、集合的高级用法
-2. 学习 Python 的类型提示系统
-3. 实践类型提示在实际项目中的应用
+## 一、准备工作
 
-## 🗺️ 手把手路线
+```powershell
+# 激活虚拟环境
+cd D:\claude-workspace\agent-factory
+venv\Scripts\activate
 
-### Step 1: 高级数据结构
-- **做什么**: 学习列表推导式、字典推导式、集合操作
-- **为什么**: 这些是 Pythonic 代码的标志
-- **成功标志**: 能用推导式简化代码
+# 创建今天的练习文件
+code day6_practice.py
+```
 
-### Step 2: 类型提示基础
-- **做什么**: 学习基本类型注解和常用类型
-- **为什么**: 类型提示让代码更清晰，IDE 支持更好
-- **成功标志**: 能为函数和变量添加类型提示
+---
 
-### Step 3: 高级类型提示
-- **做什么**: 学习泛型、Optional、Union 等高级类型
-- **为什么**: 处理复杂数据结构时需要更精确的类型定义
-- **成功标志**: 能定义复杂的类型提示
+## 二、列表推导式
 
-## 💻 代码区
+列表推导式是 Python 最优雅的特性之一，可以用一行代码替代多行循环。
+
+### 2.1 基本语法
 
 ```python
-# 高级数据结构示例
-
-# 列表推导式
+# 传统写法：创建偶数平方列表
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-# 传统方式
 squares = []
 for num in numbers:
     if num % 2 == 0:
         squares.append(num ** 2)
+print(squares)  # [4, 16, 36, 64, 100]
 
-# 推导式方式
+# 推导式写法（一行搞定）
 squares = [num ** 2 for num in numbers if num % 2 == 0]
-print(f"偶数平方: {squares}")
+print(squares)  # [4, 16, 36, 64, 100]
 
-# 字典推导式
-names = ["张三", "李四", "王五"]
-ages = [25, 30, 28]
-
-# 创建字典
-name_age = {name: age for name, age in zip(names, ages)}
-print(f"姓名年龄: {name_age}")
-
-# 集合操作
-set_a = {1, 2, 3, 4, 5}
-set_b = {4, 5, 6, 7, 8}
-
-print(f"交集: {set_a & set_b}")
-print(f"并集: {set_a | set_b}")
-print(f"差集: {set_a - set_b}")
-print(f"对称差集: {set_a ^ set_b}")
-
-# 默认字典
-from collections import defaultdict
-
-# 统计单词出现次数
-text = "apple banana apple orange banana apple"
-words = text.split()
-word_count = defaultdict(int)
-for word in words:
-    word_count[word] += 1
-print(f"单词计数: {dict(word_count)}")
-
-# 有序字典
-from collections import OrderedDict
-
-ordered_dict = OrderedDict()
-ordered_dict["first"] = 1
-ordered_dict["second"] = 2
-ordered_dict["third"] = 3
-print(f"有序字典: {ordered_dict}")
+# 语法: [表达式 for 变量 in 可迭代对象 if 条件]
 ```
 
+### 2.2 实用示例
+
 ```python
-# 类型提示基础示例
+# 提取字符串中的数字
+text = "abc123def456"
+digits = [char for char in text if char.isdigit()]
+print(digits)  # ['1', '2', '3', '4', '5', '6']
+print("".join(digits))  # "123456"
 
-from typing import List, Dict, Tuple, Set, Optional, Union
+# 将字符串列表转为小写
+names = ["Alice", "Bob", "Charlie"]
+lower_names = [name.lower() for name in names]
+print(lower_names)  # ['alice', 'bob', 'charlie']
 
-# 基本类型注解
+# 过滤并转换
+scores = [85, 42, 92, 55, 78, 30, 96]
+passed = [score for score in scores if score >= 60]
+print(f"及格成绩: {passed}")  # [85, 92, 78, 96]
+print(f"及格人数: {len(passed)}")  # 4
+
+# 嵌套推导式（展平二维列表）
+matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+flat = [num for row in matrix for num in row]
+print(flat)  # [1, 2, 3, 4, 5, 6, 7, 8, 9]
+```
+
+---
+
+## 三、字典推导式
+
+```python
+# 基本字典推导式
+names = ["张三", "李四", "王五"]
+scores = [85, 92, 78]
+
+name_score = {name: score for name, score in zip(names, scores)}
+print(name_score)  # {'张三': 85, '李四': 92, '王五': 78}
+
+# 反转字典
+reversed_dict = {score: name for name, score in name_score.items()}
+print(reversed_dict)  # {85: '张三', 92: '李四', 78: '王五'}
+
+# 条件过滤
+high_scores = {name: score for name, score in name_score.items() if score >= 80}
+print(f"高分同学: {high_scores}")  # {'张三': 85, '李四': 92}
+
+# 字符串长度统计
+words = ["hello", "world", "python", "ai"]
+lengths = {word: len(word) for word in words}
+print(lengths)  # {'hello': 5, 'world': 5, 'python': 6, 'ai': 2}
+```
+
+---
+
+## 四、集合操作
+
+```python
+# 集合去重
+numbers = [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
+unique = set(numbers)
+print(f"去重: {unique}")  # {1, 2, 3, 4}
+print(f"元素个数: {len(unique)}")  # 4
+
+# 集合运算
+python_students = {"张三", "李四", "王五", "赵六"}
+java_students = {"李四", "王五", "钱七", "孙八"}
+
+# 同时学两种语言
+both = python_students & java_students  # 交集
+print(f"同时学: {both}")  # {'李四', '王五'}
+
+# 只学了 Python
+python_only = python_students - java_students  # 差集
+print(f"只学 Python: {python_only}")  # {'张三', '赵六'}
+
+# 至少学了一种
+all_students = python_students | java_students  # 并集
+print(f"所有人: {all_students}")
+
+# 只学了一种（不是两种都学）
+exclusive = python_students ^ java_students  # 对称差集
+print(f"只学一种: {exclusive}")
+```
+
+---
+
+## 五、f-string 高级用法
+
+f-string 是 Python 3.6+ 引入的字符串格式化方式，非常强大。
+
+```python
+# 基本用法
+name = "张三"
+age = 25
+print(f"我叫{name}，今年{age}岁")
+
+# 表达式
+print(f"明年{age + 1}岁")  # 明年26岁
+print(f"{'成年' if age >= 18 else '未成年'}")  # 成年
+
+# 格式化数字
+pi = 3.14159265
+print(f"保留两位小数: {pi:.2f}")  # 3.14
+print(f"百分比: {0.856:.1%}")     # 85.6%
+print(f"千分位: {1234567:,}")     # 1,234,567
+print(f"科学计数法: {1234567:.2e}")  # 1.23e+06
+
+# 对齐和填充
+items = [("苹果", 5), ("香蕉", 12), ("橙子", 100)]
+for name, count in items:
+    print(f"{name:>5}: {'#' * count}")
+# 苹果: #####
+# 香蕉: ############
+#  橙子: ####################################################################################################
+
+# 多行 f-string
+data = {"name": "张三", "age": 25, "city": "北京"}
+info = (
+    f"姓名: {data['name']}\n"
+    f"年龄: {data['age']}\n"
+    f"城市: {data['city']}"
+)
+print(info)
+```
+
+---
+
+## 六、类型提示（Type Hints）
+
+类型提示不会影响代码运行，但它能让代码更清晰，IDE 也能提供更好的自动补全和错误检查。
+
+### 6.1 基本类型提示
+
+```python
+# 变量类型提示
+name: str = "张三"
+age: int = 25
+height: float = 1.75
+is_student: bool = True
+
+# 函数类型提示
+def add(a: int, b: int) -> int:
+    """两数相加"""
+    return a + b
+
 def greet(name: str) -> str:
-    """问候函数"""
-    return f"你好, {name}!"
+    """打招呼"""
+    return f"Hello, {name}!"
+
+# 无返回值的函数用 -> None
+def print_hello() -> None:
+    print("Hello")
+```
+
+### 6.2 复杂类型提示
+
+```python
+from typing import Optional, Union
 
 # 列表类型
-def process_numbers(numbers: List[int]) -> List[int]:
+def process_numbers(numbers: list[int]) -> list[int]:
     """处理数字列表"""
     return [num * 2 for num in numbers]
 
+# Python 3.9+ 可以直接用 list、dict 等小写形式
+# Python 3.8 及以下需要 from typing import List, Dict
+
 # 字典类型
-def create_user_dict(names: List[str], ages: List[int]) -> Dict[str, int]:
-    """创建用户字典"""
-    return {name: age for name, age in zip(names, ages)}
+def create_mapping(keys: list[str], values: list[int]) -> dict[str, int]:
+    """创建键值映射"""
+    return {k: v for k, v in zip(keys, values)}
 
-# 元组类型
-def get_coordinates() -> Tuple[float, float]:
-    """获取坐标"""
-    return (116.404, 39.915)
-
-# 集合类型
-def find_unique_elements(list1: List[int], list2: List[int]) -> Set[int]:
-    """查找唯一元素"""
-    return set(list1) ^ set(list2)
-
-# 可选类型
-def find_user(user_id: int) -> Optional[Dict]:
-    """查找用户，可能返回 None"""
+# 可选类型（值可能是 None）
+def find_user(user_id: int) -> Optional[dict]:
+    """查找用户，找不到返回 None"""
     users = {1: {"name": "张三"}, 2: {"name": "李四"}}
     return users.get(user_id)
 
-# 联合类型
+# 联合类型（值可以是多种类型之一）
 def process_value(value: Union[int, str]) -> str:
     """处理不同类型的数据"""
     if isinstance(value, int):
         return f"数字: {value}"
-    else:
-        return f"字符串: {value}"
+    return f"字符串: {value}"
 
-# 测试类型提示
-if __name__ == "__main__":
-    print(greet("小明"))
-    
-    numbers = [1, 2, 3, 4, 5]
-    doubled = process_numbers(numbers)
-    print(f"加倍后: {doubled}")
-    
-    names = ["张三", "李四", "王五"]
-    ages = [25, 30, 28]
-    user_dict = create_user_dict(names, ages)
-    print(f"用户字典: {user_dict}")
-    
-    coords = get_coordinates()
-    print(f"坐标: {coords}")
-    
-    list1 = [1, 2, 3, 4]
-    list2 = [3, 4, 5, 6]
-    unique = find_unique_elements(list1, list2)
-    print(f"唯一元素: {unique}")
-    
-    user = find_user(1)
-    print(f"找到用户: {user}")
-    
-    print(process_value(42))
-    print(process_value("hello"))
+# Python 3.10+ 可以用 | 代替 Union
+def process_value_v2(value: int | str) -> str:
+    if isinstance(value, int):
+        return f"数字: {value}"
+    return f"字符串: {value}"
 ```
 
+### 6.3 函数类型
+
 ```python
-# 高级类型提示示例
+from typing import Callable
 
-from typing import Callable, Iterator, Generator, Any, TypeVar, Generic
-from dataclasses import dataclass
-from enum import Enum
+# 函数作为参数
+def apply(func: Callable[[int, int], int], a: int, b: int) -> int:
+    """将函数应用到两个参数"""
+    return func(a, b)
 
-# 泛型类型
-T = TypeVar('T')
+def add(x: int, y: int) -> int:
+    return x + y
 
-class Stack(Generic[T]):
-    """泛型栈类"""
-    
-    def __init__(self):
-        self.items: List[T] = []
-    
-    def push(self, item: T) -> None:
-        """添加元素"""
-        self.items.append(item)
-    
-    def pop(self) -> T:
-        """移除并返回最后一个元素"""
-        if not self.items:
-            raise IndexError("栈为空")
-        return self.items.pop()
-    
-    def peek(self) -> T:
-        """查看最后一个元素"""
-        if not self.items:
-            raise IndexError("栈为空")
-        return self.items[-1]
-    
-    def is_empty(self) -> bool:
-        """检查栈是否为空"""
-        return len(self.items) == 0
+def multiply(x: int, y: int) -> int:
+    return x * y
 
-# 函数类型
-def apply_operation(x: int, y: int, operation: Callable[[int, int], int]) -> int:
-    """应用操作到两个数字"""
-    return operation(x, y)
+print(apply(add, 3, 5))       # 8
+print(apply(multiply, 3, 5))  # 15
+```
 
-# 生成器类型
-def fibonacci_generator(n: int) -> Generator[int, None, None]:
-    """斐波那契数列生成器"""
-    a, b = 0, 1
-    for _ in range(n):
-        yield a
-        a, b = b, a + b
+---
 
-# 数据类
+## 七、dataclass 数据类
+
+`@dataclass` 装饰器能自动生成 `__init__`、`__repr__`、`__eq__` 等方法，大幅简化类的定义。
+
+```python
+from dataclasses import dataclass, field
+
+
 @dataclass
 class Student:
     """学生数据类"""
     name: str
     age: int
-    scores: List[float] = None
-    
-    def __post_init__(self):
-        if self.scores is None:
-            self.scores = []
-    
-    def average_score(self) -> float:
+    scores: list[float] = field(default_factory=list)
+
+    def average(self) -> float:
         """计算平均分"""
         if not self.scores:
             return 0.0
         return sum(self.scores) / len(self.scores)
 
-# 枚举类
-class Color(Enum):
-    """颜色枚举"""
-    RED = "红色"
-    GREEN = "绿色"
-    BLUE = "蓝色"
 
-# 测试高级类型
-if __name__ == "__main__":
-    # 测试泛型栈
-    int_stack: Stack[int] = Stack()
-    int_stack.push(1)
-    int_stack.push(2)
-    int_stack.push(3)
-    print(f"栈顶元素: {int_stack.peek()}")
-    
-    str_stack: Stack[str] = Stack()
-    str_stack.push("hello")
-    str_stack.push("world")
-    print(f"字符串栈顶: {str_stack.peek()}")
-    
-    # 测试函数类型
-    def add(x: int, y: int) -> int:
-        return x + y
-    
-    def multiply(x: int, y: int) -> int:
-        return x * y
-    
-    print(f"加法: {apply_operation(5, 3, add)}")
-    print(f"乘法: {apply_operation(5, 3, multiply)}")
-    
-    # 测试生成器
-    fib_list = list(fibonacci_generator(10))
-    print(f"斐波那契数列: {fib_list}")
-    
-    # 测试数据类
-    student = Student("张三", 20, [85, 92, 78])
-    print(f"学生信息: {student}")
-    print(f"平均分: {student.average_score():.1f}")
-    
-    # 测试枚举
-    print(f"颜色: {Color.RED.value}")
+# dataclass 自动生成了 __init__，所以可以直接传参数创建
+s1 = Student("张三", 20, [85, 92, 78])
+s2 = Student("李四", 22, [90, 88, 95])
+
+# 自动生成了 __repr__，print 时输出可读的信息
+print(s1)  # Student(name='张三', age=20, scores=[85, 92, 78])
+
+# 自动生成了 __eq__，可以直接比较
+print(s1 == s2)  # False（name 不同）
+
+# 使用自定义方法
+print(f"{s1.name} 的平均分: {s1.average():.1f}")  # 张三 的平均分: 85.0
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 类型提示报错 | 确保导入 `typing` 模块中的类型 |
-| 2 | 泛型使用错误 | 确保定义 TypeVar 并正确传递类型参数 |
-| 3 | 数据类属性错误 | 使用 `@dataclass` 装饰器，检查字段定义 |
-| 4 | 生成器不工作 | 确保使用 `yield` 而不是 `return` |
+### 使用 Pydantic（进阶）
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| 列表推导式 | 用简洁语法创建列表的方法 |
-| 类型提示 | 为变量和函数添加类型信息的语法 |
-| 泛型 | 可以处理多种类型的类或函数 |
-| Optional | 表示值可以是 None |
-| Union | 表示值可以是多种类型之一 |
-| Callable | 可调用对象（如函数）的类型 |
-| Generator | 使用 yield 的生成器函数 |
-| Dataclass | 自动生成 __init__ 等方法的类 |
+Pydantic 是一个更强大的数据验证库，常用于 API 开发。
 
-## ✅ 验收清单
-- [ ] 能熟练使用列表和字典推导式
-- [ ] 能为函数和变量添加基本类型提示
+```bash
+# 先安装 pydantic
+pip install pydantic
+```
+
+```python
+from pydantic import BaseModel, Field
+
+
+class UserProfile(BaseModel):
+    """用户档案（带数据验证）"""
+    name: str = Field(..., min_length=1, max_length=50)
+    age: int = Field(..., ge=0, le=150)
+    email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "张三",
+                "age": 25,
+                "email": "zhangsan@example.com"
+            }
+        }
+
+
+# 正常创建
+user = UserProfile(name="张三", age=25, email="zhangsan@example.com")
+print(user.model_dump())  # {'name': '张三', 'age': 25, 'email': 'zhangsan@example.com'}
+
+# Pydantic 会自动验证数据
+try:
+    # 名字为空字符串，会报错
+    bad_user = UserProfile(name="", age=25, email="invalid")
+except Exception as e:
+    print(f"验证失败: {e}")
+
+try:
+    # 年龄为负数，会报错
+    bad_user = UserProfile(name="张三", age=-5, email="test@example.com")
+except Exception as e:
+    print(f"验证失败: {e}")
+```
+
+---
+
+## 八、enumerate 和 zip
+
+```python
+# enumerate: 同时获取索引和值
+fruits = ["苹果", "香蕉", "橙子"]
+for i, fruit in enumerate(fruits):
+    print(f"{i + 1}. {fruit}")
+# 1. 苹果
+# 2. 香蕉
+# 3. 橙子
+
+# zip: 将多个列表"拉链"在一起
+names = ["张三", "李四", "王五"]
+ages = [25, 30, 28]
+cities = ["北京", "上海", "广州"]
+
+for name, age, city in zip(names, ages, cities):
+    print(f"{name}, {age}岁, 来自{city}")
+# 张三, 25岁, 来自北京
+# 李四, 30岁, 来自上海
+# 王五, 28岁, 来自广州
+```
+
+---
+
+## 九、综合练习
+
+写一个简单的学生成绩分析系统：
+
+```python
+"""
+学生成绩分析系统
+综合练习：推导式、字典操作、类型提示、dataclass
+"""
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Student:
+    """学生"""
+    name: str
+    scores: dict[str, float] = field(default_factory=dict)
+
+    def add_score(self, subject: str, score: float) -> None:
+        self.scores[subject] = score
+
+    def average(self) -> float:
+        if not self.scores:
+            return 0.0
+        return sum(self.scores.values()) / len(self.scores)
+
+    def highest_subject(self) -> str:
+        if not self.scores:
+            return "无"
+        return max(self.scores, key=self.scores.get)
+
+    def lowest_subject(self) -> str:
+        if not self.scores:
+            return "无"
+        return min(self.scores, key=self.scores.get)
+
+    def passed_subjects(self) -> list[str]:
+        return [subject for subject, score in self.scores.items() if score >= 60]
+
+
+def analyze_class(students: list[Student]) -> dict:
+    """分析全班成绩"""
+    if not students:
+        return {}
+
+    # 用推导式计算各种统计
+    averages = {s.name: s.average() for s in students}
+    class_average = sum(averages.values()) / len(averages)
+
+    # 找出最高分和最低分的学生
+    best_student = max(students, key=lambda s: s.average())
+    worst_student = min(students, key=lambda s: s.average())
+
+    return {
+        "班级平均分": round(class_average, 1),
+        "个人平均分": averages,
+        "最高分学生": best_student.name,
+        "最低分学生": worst_student.name,
+    }
+
+
+def main():
+    # 创建学生
+    students = [
+        Student("张三", {"数学": 85, "英语": 92, "物理": 78}),
+        Student("李四", {"数学": 55, "英语": 68, "物理": 42}),
+        Student("王五", {"数学": 90, "英语": 88, "物理": 95}),
+    ]
+
+    # 打印每个学生的信息
+    for student in students:
+        print(f"\n{student.name}:")
+        print(f"  各科成绩: {student.scores}")
+        print(f"  平均分: {student.average():.1f}")
+        print(f"  最强科目: {student.highest_subject()}")
+        print(f"  最弱科目: {student.lowest_subject()}")
+        print(f"  及格科目: {student.passed_subjects()}")
+
+    # 班级分析
+    report = analyze_class(students)
+    print(f"\n{'=' * 40}")
+    print(f"班级平均分: {report['班级平均分']}")
+    print(f"最高分学生: {report['最高分学生']}")
+    print(f"最低分学生: {report['最低分学生']}")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+**运行结果：**
+```
+张三:
+  各科成绩: {'数学': 85, '英语': 92, '物理': 78}
+  平均分: 85.0
+  最强科目: 英语
+  最弱科目: 物理
+  及格科目: ['数学', '英语', '物理']
+
+李四:
+  各科成绩: {'数学': 55, '英语': 68, '物理': 42}
+  平均分: 55.0
+  最强科目: 英语
+  最弱科目: 物理
+  及格科目: ['英语']
+
+王五:
+  各科成绩: {'数学': 90, '英语': 88, '物理': 95}
+  平均分: 91.0
+  最强科目: 物理
+  最弱科目: 英语
+  及格科目: ['数学', '英语', '物理']
+
+========================================
+班级平均分: 77.0
+最高分学生: 王五
+最低分学生: 李四
+```
+
+---
+
+## 十、今日验收清单
+
+- [ ] 能熟练使用列表推导式
+- [ ] 能熟练使用字典推导式
+- [ ] 能为函数和变量添加类型提示
 - [ ] 理解 Optional 和 Union 的用法
-- [ ] 能使用 dataclass 简化类定义
+- [ ] 能使用 @dataclass 简化类定义
+- [ ] 能使用 enumerate 和 zip 简化循环
+- [ ] 完成综合练习并运行成功
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+---
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+## 十一、常见错误
+
+**错误 1：推导式语法错误**
+```python
+# 错误: 条件放在了前面
+[num for if num % 2 == 0 num in numbers]
+
+# 正确: 条件放在最后
+[num for num in numbers if num % 2 == 0]
+```
+
+**错误 2：类型提示和实际类型不匹配**
+```python
+def add(a: int, b: int) -> int:
+    return a + b
+
+result = add("hello", " world")  # 运行时不报错，但类型检查会警告
+```
+
+**错误 3：@dataclass 忘记导入**
+```python
+# 需要先导入
+from dataclasses import dataclass
+```
+
+---
+
+## 十二、今日复盘
+
+- 推导式你觉得方便吗？哪些场景会用到？
+- 类型提示对代码可读性有帮助吗？
+- Pydantic 的数据验证你觉得实用吗？
+
+---
+
+## 十三、明日预告
+
+明天是 Week 0 的最后一天——**周复盘 + 环境检查**。我们将回顾本周所有内容，运行完整的环境检查脚本，确保一切就绪。

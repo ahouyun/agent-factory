@@ -1,144 +1,74 @@
-# 📅 Week 11 Day 4：可观测性三支柱：Traces / Metrics / Logs
+# 🔍 Day 4: 可观测性 — 给 Agent 装上"监控摄像头"
 
-## 🧭 今日方向
-> 理解可观测性的三大支柱（Traces、Metrics、Logs），学会如何用它们监控和调试 Agent 系统。
+## 今日方向
 
-## 🎯 生活比喻
-> 可观测性就像汽车的仪表盘。Traces 是 GPS 轨迹，记录你从 A 到 B 的完整路线；Metrics 是速度表、油量表，告诉你当前状态；Logs 是行车记录仪，记录沿途发生的具体事件。三者结合，你才能全面了解"车"（Agent）的运行状况。
+> "你无法改进你无法测量的东西。" -- Peter Drucker
 
-## 📋 今日三件事
-1. 理解 Traces、Metrics、Logs 的定义和区别
-2. 学习如何在 Agent 系统中实现可观测性
-3. 实现一个简单的可观测性框架
+今天我们来学习 Agent 的可观测性（Observability）。通过 Traces（追踪）、Metrics（指标）和 Logs（日志）三大支柱，让你能够实时监控和调试 Agent 的行为。
 
-## 🗺️ 手把手路线
+## 生活比喻
 
-### Step 1：理解三大支柱
-- 做什么: 学习 Traces、Metrics、Logs 的核心概念
-- 为什么: 这是监控 Agent 的基础
-- 成功标志: 能解释三者的区别和联系
+想象你是一家快递公司的管理者：
 
-### Step 2：Traces 实践
-- 做什么: 学习分布式追踪的实现原理
-- 为什么: Traces 能追踪请求的完整执行路径
-- 成功标志: 能实现简单的 Trace 上下文管理
+- **Traces（追踪）** = 快递的完整运输路线（从发货到签收的全过程）
+- **Metrics（指标）** = 每天的快递量、准时率、投诉率（量化数据）
+- **Logs（日志）** = 每个快递员的工作记录（详细事件）
 
-### Step 3：Metrics 实践
-- 做什么: 学习指标收集和聚合
-- 为什么: Metrics 能量化系统性能
-- 成功标志: 能定义和收集关键指标
+有了这三样东西，你就能全面掌控整个快递系统。
 
-### Step 4：Logs 实践
-- 做什么: 学习结构化日志的记录方式
-- 为什么: Logs 能记录详细的运行信息
-- 成功标志: 能实现结构化日志记录
+## 今日三件事
 
-## 💻 代码区
+1. **理解三大支柱**：Traces、Metrics、Logs 的概念和用途
+2. **使用 OpenTelemetry**：为 Agent 添加追踪和指标
+3. **设计监控仪表板**：构建可视化的监控系统
+
+---
+
+## 手把手路线
+
+### 第一步：安装依赖
+
+```bash
+pip install opentelemetry-api opentelemetry-sdk psutil
+```
+
+### 第二步：理解三大支柱
 
 ```python
-"""
-可观测性三支柱：Traces / Metrics / Logs
-完整的实现示例
-"""
-import time
-import uuid
+# observability_basics.py
+"""可观测性三大支柱基础"""
+
 import json
-import logging
+import time
+import random
 from datetime import datetime
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Callable
-from contextlib import contextmanager
-from collections import defaultdict
 from enum import Enum
 
-# ========== 1. 日志级别 ==========
 
-class LogLevel(Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+class MetricType(Enum):
+    """指标类型"""
+    COUNTER = "counter"
+    GAUGE = "gauge"
+    HISTOGRAM = "histogram"
 
-
-# ========== 2. 结构化日志 ==========
 
 @dataclass
 class LogEntry:
     """日志条目"""
     timestamp: str
-    level: LogLevel
+    level: str
     message: str
-    trace_id: str = ""
-    span_id: str = ""
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    context: Dict[str, Any] = field(default_factory=dict)
 
+    def to_dict(self) -> dict:
+        return {"timestamp": self.timestamp, "level": self.level,
+                "message": self.message, "context": self.context}
 
-class StructuredLogger:
-    """结构化日志记录器"""
-    
-    def __init__(self, name: str):
-        self.name = name
-        self.entries: List[LogEntry] = []
-        self.min_level = LogLevel.INFO
-    
-    def set_level(self, level: LogLevel):
-        self.min_level = level
-    
-    def _should_log(self, level: LogLevel) -> bool:
-        levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL]
-        return levels.index(level) >= levels.index(self.min_level)
-    
-    def log(self, level: LogLevel, message: str, **attributes):
-        if not self._should_log(level):
-            return
-        
-        entry = LogEntry(
-            timestamp=datetime.now().isoformat(),
-            level=level,
-            message=message,
-            attributes=attributes
-        )
-        self.entries.append(entry)
-    
-    def debug(self, message: str, **attributes):
-        self.log(LogLevel.DEBUG, message, **attributes)
-    
-    def info(self, message: str, **attributes):
-        self.log(LogLevel.INFO, message, **attributes)
-    
-    def warning(self, message: str, **attributes):
-        self.log(LogLevel.WARNING, message, **attributes)
-    
-    def error(self, message: str, **attributes):
-        self.log(LogLevel.ERROR, message, **attributes)
-    
-    def critical(self, message: str, **attributes):
-        self.log(LogLevel.CRITICAL, message, **attributes)
-    
-    def get_entries(self, level: Optional[LogLevel] = None) -> List[LogEntry]:
-        if level:
-            return [e for e in self.entries if e.level == level]
-        return self.entries
-    
-    def to_json(self) -> str:
-        entries_dict = [
-            {
-                "timestamp": e.timestamp,
-                "level": e.level.value,
-                "message": e.message,
-                "trace_id": e.trace_id,
-                "attributes": e.attributes
-            }
-            for e in self.entries
-        ]
-        return json.dumps(entries_dict, ensure_ascii=False, indent=2)
-
-
-# ========== 3. Traces 追踪 ==========
 
 @dataclass
-class Span:
+class TraceSpan:
     """追踪跨度"""
     span_id: str
     trace_id: str
@@ -148,380 +78,809 @@ class Span:
     parent_span_id: Optional[str] = None
     attributes: Dict[str, Any] = field(default_factory=dict)
     events: List[Dict] = field(default_factory=list)
-    status: str = "OK"
-    
+
     @property
-    def duration_ms(self) -> float:
-        return (self.end_time - self.start_time) * 1000
-    
-    def add_event(self, name: str, attributes: Dict = None):
-        self.events.append({
-            "name": name,
-            "timestamp": time.time(),
-            "attributes": attributes or {}
-        })
-    
-    def finish(self):
-        self.end_time = time.time()
+    def duration(self) -> float:
+        return self.end_time - self.start_time
 
-
-class Tracer:
-    """分布式追踪器"""
-    
-    def __init__(self, service_name: str):
-        self.service_name = service_name
-        self.spans: List[Span] = []
-        self._current_trace_id: Optional[str] = None
-        self._current_span_id: Optional[str] = None
-    
-    def start_trace(self, name: str) -> str:
-        """开始新的追踪"""
-        trace_id = str(uuid.uuid4())
-        self._current_trace_id = trace_id
-        
-        span = Span(
-            span_id=str(uuid.uuid4()),
-            trace_id=trace_id,
-            name=name,
-            start_time=time.time()
-        )
-        self.spans.append(span)
-        self._current_span_id = span.span_id
-        
-        return trace_id
-    
-    def start_span(self, name: str) -> Span:
-        """开始新的跨度"""
-        span = Span(
-            span_id=str(uuid.uuid4()),
-            trace_id=self._current_trace_id or str(uuid.uuid4()),
-            name=name,
-            start_time=time.time(),
-            parent_span_id=self._current_span_id
-        )
-        self.spans.append(span)
-        self._current_span_id = span.span_id
-        
-        return span
-    
-    @contextmanager
-    def trace(self, name: str):
-        """追踪上下文管理器"""
-        span = self.start_span(name)
-        try:
-            yield span
-        except Exception as e:
-            span.status = "ERROR"
-            span.add_event("error", {"message": str(e)})
-            raise
-        finally:
-            span.finish()
-    
-    def finish_trace(self):
-        """结束追踪"""
-        self._current_trace_id = None
-        self._current_span_id = None
-    
-    def get_trace(self, trace_id: str) -> List[Span]:
-        """获取追踪的所有跨度"""
-        return [s for s in self.spans if s.trace_id == trace_id]
-    
-    def get_trace_tree(self, trace_id: str) -> Dict:
-        """获取追踪树结构"""
-        spans = self.get_trace(trace_id)
-        span_map = {s.span_id: s for s in spans}
-        
-        roots = [s for s in spans if s.parent_span_id is None]
-        
-        def build_tree(span):
-            children = [s for s in spans if s.parent_span_id == span.span_id]
-            return {
-                "span_id": span.span_id,
-                "name": span.name,
-                "duration_ms": span.duration_ms,
-                "status": span.status,
-                "children": [build_tree(c) for c in children]
-            }
-        
+    def to_dict(self) -> dict:
         return {
-            "trace_id": trace_id,
-            "spans": [build_tree(r) for r in roots]
+            "span_id": self.span_id, "trace_id": self.trace_id,
+            "name": self.name, "start_time": self.start_time,
+            "end_time": self.end_time,
+            "duration_ms": round(self.duration * 1000, 2),
+            "parent_span_id": self.parent_span_id,
+            "attributes": self.attributes,
         }
 
 
-# ========== 4. Metrics 指标 ==========
-
 @dataclass
-class MetricPoint:
-    """指标数据点"""
+class Metric:
+    """指标"""
     name: str
     value: float
+    metric_type: MetricType
     timestamp: float
     labels: Dict[str, str] = field(default_factory=dict)
 
-
-class MetricsCollector:
-    """指标收集器"""
-    
-    def __init__(self):
-        self.counters: Dict[str, int] = defaultdict(int)
-        self.gauges: Dict[str, float] = {}
-        self.histograms: Dict[str, List[float]] = defaultdict(list)
-        self.points: List[MetricPoint] = []
-    
-    def increment(self, name: str, value: int = 1, **labels):
-        """递增计数器"""
-        key = self._make_key(name, labels)
-        self.counters[key] += value
-        self._record_point(name, self.counters[key], labels)
-    
-    def set_gauge(self, name: str, value: float, **labels):
-        """设置仪表盘值"""
-        key = self._make_key(name, labels)
-        self.gauges[key] = value
-        self._record_point(name, value, labels)
-    
-    def observe(self, name: str, value: float, **labels):
-        """记录直方图值"""
-        key = self._make_key(name, labels)
-        self.histograms[key].append(value)
-        self._record_point(name, value, labels)
-    
-    def _make_key(self, name: str, labels: Dict) -> str:
-        label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
-        return f"{name}{{{label_str}}}" if label_str else name
-    
-    def _record_point(self, name: str, value: float, labels: Dict):
-        self.points.append(MetricPoint(
-            name=name,
-            value=value,
-            timestamp=time.time(),
-            labels=labels
-        ))
-    
-    def get_counter(self, name: str, **labels) -> int:
-        key = self._make_key(name, labels)
-        return self.counters.get(key, 0)
-    
-    def get_gauge(self, name: str, **labels) -> float:
-        key = self._make_key(name, labels)
-        return self.gauges.get(key, 0.0)
-    
-    def get_histogram_stats(self, name: str, **labels) -> Dict:
-        key = self._make_key(name, labels)
-        values = self.histograms.get(key, [])
-        if not values:
-            return {}
-        
-        sorted_vals = sorted(values)
-        return {
-            "count": len(values),
-            "min": sorted_vals[0],
-            "max": sorted_vals[-1],
-            "avg": sum(values) / len(values),
-            "p50": sorted_vals[len(sorted_vals) // 2],
-            "p95": sorted_vals[int(len(sorted_vals) * 0.95)],
-            "p99": sorted_vals[int(len(sorted_vals) * 0.99)]
-        }
-    
-    def get_summary(self) -> Dict:
-        return {
-            "counters": dict(self.counters),
-            "gauges": dict(self.gauges),
-            "histograms": {
-                k: self.get_histogram_stats(k.split("{")[0]) 
-                for k in self.histograms.keys()
-            }
-        }
+    def to_dict(self) -> dict:
+        return {"name": self.name, "value": self.value,
+                "type": self.metric_type.value, "timestamp": self.timestamp}
 
 
-# ========== 5. 可观测性整合 ==========
+class ObservabilityManager:
+    """可观测性管理器"""
 
-class ObservabilityFramework:
-    """可观测性框架"""
-    
     def __init__(self, service_name: str):
         self.service_name = service_name
-        self.logger = StructuredLogger(service_name)
-        self.tracer = Tracer(service_name)
-        self.metrics = MetricsCollector()
-    
-    @contextmanager
-    def trace_operation(self, operation_name: str):
-        """追踪操作"""
-        span = self.tracer.start_span(operation_name)
-        self.logger.info(f"开始操作: {operation_name}")
-        
-        start_time = time.time()
-        try:
-            yield span
-        except Exception as e:
-            span.status = "ERROR"
-            self.logger.error(f"操作失败: {operation_name}", error=str(e))
-            self.metrics.increment("errors", operation=operation_name)
-            raise
-        finally:
-            span.finish()
-            duration = time.time() - start_time
-            self.metrics.observe("operation_duration", duration * 1000, operation=operation_name)
-            self.logger.info(f"操作完成: {operation_name}", duration_ms=duration * 1000)
-    
-    def record_metric(self, name: str, value: float, **labels):
+        self.logs: List[LogEntry] = []
+        self.traces: List[TraceSpan] = []
+        self.metrics: List[Metric] = []
+        self._current_trace_id = None
+        self._span_stack: List[TraceSpan] = []
+
+    def start_trace(self, operation_name: str) -> str:
+        """开始一个新的追踪"""
+        trace_id = f"trace_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+        self._current_trace_id = trace_id
+        root_span = TraceSpan(
+            span_id=f"span_{int(time.time() * 1000)}",
+            trace_id=trace_id, name=operation_name,
+            start_time=time.time(),
+            attributes={"service": self.service_name},
+        )
+        self._span_stack.append(root_span)
+        self.traces.append(root_span)
+        self.log("INFO", f"开始追踪: {operation_name}", {"trace_id": trace_id})
+        return trace_id
+
+    def start_span(self, span_name: str, attributes: Dict = None) -> str:
+        """开始一个新的跨度"""
+        span = TraceSpan(
+            span_id=f"span_{int(time.time() * 1000)}_{random.randint(100, 999)}",
+            trace_id=self._current_trace_id, name=span_name,
+            start_time=time.time(),
+            parent_span_id=self._span_stack[-1].span_id if self._span_stack else None,
+            attributes=attributes or {},
+        )
+        self._span_stack.append(span)
+        self.traces.append(span)
+        return span.span_id
+
+    def end_span(self):
+        """结束当前跨度"""
+        if self._span_stack:
+            span = self._span_stack.pop()
+            span.end_time = time.time()
+            self.log("DEBUG", f"结束跨度: {span.name}",
+                     {"duration_ms": span.duration * 1000})
+
+    def end_trace(self):
+        """结束当前追踪"""
+        while self._span_stack:
+            self.end_span()
+        self.log("INFO", "追踪结束", {"trace_id": self._current_trace_id})
+        self._current_trace_id = None
+
+    def log(self, level: str, message: str, context: Dict = None):
+        """记录日志"""
+        entry = LogEntry(
+            timestamp=datetime.now().isoformat(),
+            level=level, message=message, context=context or {},
+        )
+        self.logs.append(entry)
+        print(f"[{level}] {message}")
+
+    def record_metric(self, name: str, value: float,
+                     metric_type: MetricType = MetricType.GAUGE,
+                     labels: Dict[str, str] = None):
         """记录指标"""
-        self.metrics.set_gauge(name, value, **labels)
-    
-    def increment_metric(self, name: str, value: int = 1, **labels):
-        """递增指标"""
-        self.metrics.increment(name, value, **labels)
+        metric = Metric(name=name, value=value, metric_type=metric_type,
+                        timestamp=time.time(), labels=labels or {})
+        self.metrics.append(metric)
 
+    def get_trace_summary(self, trace_id: str = None) -> Dict:
+        """获取追踪摘要"""
+        spans = [s for s in self.traces if s.trace_id == trace_id] if trace_id else self.traces
+        if not spans:
+            return {"error": "No traces found"}
+        total_duration = sum(s.duration for s in spans)
+        return {
+            "trace_id": spans[0].trace_id if spans else None,
+            "span_count": len(spans),
+            "total_duration_ms": round(total_duration * 1000, 2),
+            "spans": [s.to_dict() for s in spans],
+        }
 
-# ========== 6. Agent 可观测性示例 ==========
+    def get_metrics_summary(self) -> Dict:
+        """获取指标摘要"""
+        if not self.metrics:
+            return {"error": "No metrics found"}
+        metrics_by_name = {}
+        for metric in self.metrics:
+            if metric.name not in metrics_by_name:
+                metrics_by_name[metric.name] = []
+            metrics_by_name[metric.name].append(metric.value)
+        summary = {}
+        for name, values in metrics_by_name.items():
+            summary[name] = {
+                "count": len(values), "min": min(values), "max": max(values),
+                "avg": round(sum(values) / len(values), 4), "latest": values[-1],
+            }
+        return summary
 
-class ObservableAgent:
-    """可观察的 Agent"""
-    
-    def __init__(self, obs: ObservabilityFramework):
-        self.obs = obs
-    
-    def process_task(self, task: str) -> str:
-        """处理任务"""
-        with self.obs.trace_operation("process_task") as span:
-            span.attributes["task"] = task
-            self.obs.logger.info(f"处理任务: {task}")
-            
-            # 步骤 1: 理解任务
-            with self.obs.trace_operation("understand_task") as inner_span:
-                self.obs.increment_metric("task_steps", step="understand")
-                understanding = self._understand_task(task)
-            
-            # 步骤 2: 执行任务
-            with self.obs.trace_operation("execute_task") as inner_span:
-                self.obs.increment_metric("task_steps", step="execute")
-                result = self._execute_task(task)
-            
-            # 步骤 3: 验证结果
-            with self.obs.trace_operation("verify_result") as inner_span:
-                self.obs.increment_metric("task_steps", step="verify")
-                verified = self._verify_result(result)
-            
-            self.obs.record_metric("task_success", 1.0 if verified else 0.0)
-            
-            return result
-    
-    def _understand_task(self, task: str) -> str:
-        """理解任务"""
-        self.obs.logger.debug(f"理解任务: {task[:50]}...")
-        time.sleep(0.01)  # 模拟处理
-        return f"任务理解: {task[:20]}..."
-    
-    def _execute_task(self, task: str) -> str:
-        """执行任务"""
-        self.obs.logger.debug("执行任务中...")
-        time.sleep(0.02)  # 模拟处理
-        return f"任务结果: {task[:20]}..."
-    
-    def _verify_result(self, result: str) -> bool:
-        """验证结果"""
-        self.obs.logger.debug("验证结果...")
-        time.sleep(0.01)  # 模拟处理
-        return True
-
-
-# ========== 7. 主函数 ==========
-
-def main():
-    """主函数"""
-    print("=" * 60)
-    print("可观测性三支柱演示")
-    print("=" * 60)
-    
-    # 1. 创建框架
-    obs = ObservabilityFramework("demo-agent")
-    obs.logger.set_level(LogLevel.DEBUG)
-    
-    # 2. 创建 Agent
-    agent = ObservableAgent(obs)
-    
-    # 3. 执行任务
-    print("\n1. 执行任务...")
-    tasks = [
-        "什么是机器学习？",
-        "如何学习 Python？",
-        "解释 API 的概念"
-    ]
-    
-    for task in tasks:
-        result = agent.process_task(task)
-        print(f"   完成: {task[:20]}...")
-    
-    # 4. 查看日志
-    print("\n2. 日志:")
-    for entry in obs.logger.get_entries()[:5]:
-        print(f"   [{entry.level.value}] {entry.message}")
-    
-    # 5. 查看追踪
-    print("\n3. 追踪:")
-    print(f"   总跨度数: {len(obs.tracer.spans)}")
-    
-    # 6. 查看指标
-    print("\n4. 指标:")
-    summary = obs.metrics.get_summary()
-    print(f"   计数器: {summary['counters']}")
-    print(f"   仪表盘: {summary['gauges']}")
-    
-    # 7. 生成报告
-    print("\n5. 可观测性报告:")
-    report = {
-        "service": obs.service_name,
-        "logs_count": len(obs.logger.entries),
-        "spans_count": len(obs.tracer.spans),
-        "metrics": summary
-    }
-    print(json.dumps(report, indent=2, ensure_ascii=False))
-    
-    print("\n" + "=" * 60)
-    print("演示完成！")
-    print("=" * 60)
+    def export_all(self, filepath: str):
+        """导出所有数据"""
+        data = {
+            "service": self.service_name,
+            "export_time": datetime.now().isoformat(),
+            "traces": [t.to_dict() for t in self.traces],
+            "metrics": [m.to_dict() for m in self.metrics],
+            "logs": [l.to_dict() for l in self.logs],
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"数据已导出到: {filepath}")
 
 
 if __name__ == "__main__":
-    main()
+    manager = ObservabilityManager("agent-service")
+
+    print("可观测性三大支柱示例")
+    print("=" * 60)
+
+    trace_id = manager.start_trace("agent_query")
+
+    manager.start_span("parse_input")
+    time.sleep(0.05)
+    manager.end_span()
+
+    manager.start_span("llm_call")
+    time.sleep(0.1)
+    manager.end_span()
+
+    manager.start_span("post_process")
+    time.sleep(0.02)
+    manager.end_span()
+
+    manager.record_metric("request_count", 1, MetricType.COUNTER)
+    manager.record_metric("response_time", 0.17, MetricType.HISTOGRAM)
+    manager.record_metric("tokens_used", 150, MetricType.GAUGE)
+
+    manager.end_trace()
+
+    print("\n追踪摘要:")
+    print(json.dumps(manager.get_trace_summary(), indent=2, ensure_ascii=False))
+
+    print("\n指标摘要:")
+    print(json.dumps(manager.get_metrics_summary(), indent=2, ensure_ascii=False))
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 日志太多影响性能 | 调整日志级别，使用异步日志 |
-| 2 | 追踪数据丢失 | 确保 trace_id 正确传递 |
-| 3 | 指标不准确 | 检查指标聚合逻辑 |
-| 4 | 无法定位问题 | 增加关键节点的 trace 和 log |
-| 5 | 存储空间不足 | 配置日志轮转和数据保留策略 |
+### 第三步：使用 OpenTelemetry
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| Traces | 追踪请求的完整执行路径 |
-| Metrics | 量化的系统性能指标 |
-| Logs | 详细的运行时事件记录 |
-| Span | 追踪中的单个操作单元 |
-| Counter | 只增不减的计数器 |
-| Gauge | 可增可减的仪表盘 |
-| Histogram | 值分布的直方图 |
-| Structured Logging | 结构化格式的日志 |
+```python
+# opentelemetry_integration.py
+"""OpenTelemetry 集成示例"""
 
-## ✅ 验收清单
-- [ ] 能解释三大支柱的区别和联系
-- [ ] 能实现基本的 Trace 追踪
-- [ ] 能收集和查询 Metrics
-- [ ] 能记录结构化日志
-- [ ] 代码能跑通并输出结果
+import json
+import time
+import random
+from typing import Dict, Any, Optional
+from dataclasses import dataclass, field
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+@dataclass
+class OTelSpan:
+    """模拟 OpenTelemetry Span"""
+    name: str
+    trace_id: str
+    span_id: str
+    start_time: float
+    end_time: float = 0.0
+    attributes: Dict[str, Any] = None
+    status: str = "OK"
+
+    def __post_init__(self):
+        if self.attributes is None:
+            self.attributes = {}
+
+    def set_attribute(self, key: str, value: Any):
+        self.attributes[key] = value
+
+    def set_status(self, status: str):
+        self.status = status
+
+    def end(self):
+        self.end_time = time.time()
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name, "trace_id": self.trace_id,
+            "span_id": self.span_id, "start_time": self.start_time,
+            "end_time": self.end_time,
+            "duration_ms": round((self.end_time - self.start_time) * 1000, 2),
+            "attributes": self.attributes, "status": self.status,
+        }
+
+
+class OTelTracer:
+    """模拟 OpenTelemetry Tracer"""
+
+    def __init__(self, service_name: str):
+        self.service_name = service_name
+        self.spans: List[OTelSpan] = []
+        self._span_stack: List[OTelSpan] = []
+
+    def start_span(self, name: str, attributes: Dict = None) -> OTelSpan:
+        parent_id = self._span_stack[-1].span_id if self._span_stack else None
+        span = OTelSpan(
+            name=name,
+            trace_id=f"trace_{int(time.time() * 1000)}",
+            span_id=f"span_{int(time.time() * 1000)}_{len(self.spans)}",
+            start_time=time.time(), attributes=attributes or {},
+        )
+        if parent_id:
+            span.set_attribute("parent_span_id", parent_id)
+        self.spans.append(span)
+        self._span_stack.append(span)
+        return span
+
+    def end_span(self):
+        if self._span_stack:
+            span = self._span_stack.pop()
+            span.end()
+            return span
+        return None
+
+    def get_all_spans(self) -> list:
+        return [s.to_dict() for s in self.spans]
+
+
+# 需要导入 List
+from typing import List
+
+
+class AgentInstrumentation:
+    """Agent 仪表化"""
+
+    def __init__(self, service_name: str = "ai-agent"):
+        self.tracer = OTelTracer(service_name)
+        self.metrics = {}
+
+    def instrument_agent(self, agent_func):
+        """仪表化 Agent 函数"""
+        def wrapped_agent(query: str, **kwargs) -> Dict:
+            span = self.tracer.start_span("agent_query")
+            span.set_attribute("query", query)
+            span.set_attribute("query_length", len(query))
+            start_time = time.time()
+            try:
+                result = agent_func(query, **kwargs)
+                span.set_status("OK")
+                span.set_attribute("result_length", len(str(result)))
+                span.set_attribute("success", True)
+                self._update_metric("success_count", 1)
+                self._update_metric("total_queries", 1)
+                return result
+            except Exception as e:
+                span.set_status("ERROR")
+                span.set_attribute("error", str(e))
+                span.set_attribute("success", False)
+                self._update_metric("error_count", 1)
+                self._update_metric("total_queries", 1)
+                raise
+            finally:
+                latency = time.time() - start_time
+                span.set_attribute("latency_ms", round(latency * 1000, 2))
+                span.end()
+                self._update_metric("latency_sum", latency)
+        return wrapped_agent
+
+    def _update_metric(self, name: str, value: float):
+        if name not in self.metrics:
+            self.metrics[name] = 0
+        self.metrics[name] += value
+
+    def get_metrics(self) -> Dict:
+        return self.metrics.copy()
+
+    def get_traces(self) -> list:
+        return self.tracer.get_all_spans()
+
+
+if __name__ == "__main__":
+    print("OpenTelemetry Agent 仪表化示例")
+    print("=" * 60)
+
+    instrumentation = AgentInstrumentation("my-agent")
+
+    @instrumentation.instrument_agent
+    def my_agent(query: str) -> str:
+        time.sleep(0.1)
+        if "error" in query:
+            raise ValueError("模拟错误")
+        return f"这是对 '{query[:20]}...' 的回答"
+
+    test_queries = [
+        "你好，请问今天天气怎么样？",
+        "Python中如何读取文件？",
+        "什么是机器学习？",
+        "这是一个错误测试",
+        "最后一个问题",
+    ]
+
+    for query in test_queries:
+        try:
+            result = my_agent(query)
+            print(f"\n查询: {query}")
+            print(f"结果: {result}")
+        except Exception as e:
+            print(f"\n查询: {query}")
+            print(f"错误: {e}")
+
+    print("\n" + "=" * 60)
+    print("Agent 指标:")
+    print(json.dumps(instrumentation.get_metrics(), indent=2))
+
+    print("\n" + "=" * 60)
+    print("Agent 追踪:")
+    traces = instrumentation.get_traces()
+    for trace in traces[-5:]:
+        print(f"  {trace['name']}: {trace.get('attributes', {}).get('latency_ms', 'N/A')}ms")
+```
+
+### 第四步：结构化日志
+
+```python
+# structured_logging.py
+"""结构化日志实现"""
+
+import json
+import time
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, field
+from enum import Enum
+import traceback
+
+
+class LogLevel(Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+@dataclass
+class StructuredLog:
+    """结构化日志"""
+    timestamp: str
+    level: str
+    message: str
+    logger: str
+    trace_id: Optional[str] = None
+    span_id: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+    exception: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        result = {"timestamp": self.timestamp, "level": self.level,
+                  "message": self.message, "logger": self.logger}
+        if self.trace_id:
+            result["trace_id"] = self.trace_id
+        if self.span_id:
+            result["span_id"] = self.span_id
+        if self.extra:
+            result["extra"] = self.extra
+        if self.exception:
+            result["exception"] = self.exception
+        return result
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), ensure_ascii=False)
+
+
+class StructuredLogger:
+    """结构化日志器"""
+
+    def __init__(self, name: str, level: LogLevel = LogLevel.INFO):
+        self.name = name
+        self.level = level
+        self.logs: List[StructuredLog] = []
+        self._trace_id = None
+        self._span_id = None
+
+    def set_trace_context(self, trace_id: str, span_id: str = None):
+        self._trace_id = trace_id
+        self._span_id = span_id
+
+    def _log(self, level: LogLevel, message: str, extra: Dict = None,
+             exception: Exception = None):
+        log_entry = StructuredLog(
+            timestamp=datetime.now().isoformat(), level=level.value,
+            message=message, logger=self.name,
+            trace_id=self._trace_id, span_id=self._span_id,
+            extra=extra or {},
+        )
+        if exception:
+            log_entry.exception = traceback.format_exc()
+        self.logs.append(log_entry)
+        print(f"[{level.value}] {message}")
+        return log_entry
+
+    def debug(self, message: str, extra: Dict = None):
+        return self._log(LogLevel.DEBUG, message, extra)
+
+    def info(self, message: str, extra: Dict = None):
+        return self._log(LogLevel.INFO, message, extra)
+
+    def warning(self, message: str, extra: Dict = None):
+        return self._log(LogLevel.WARNING, message, extra)
+
+    def error(self, message: str, extra: Dict = None, exception: Exception = None):
+        return self._log(LogLevel.ERROR, message, extra, exception)
+
+    def critical(self, message: str, extra: Dict = None, exception: Exception = None):
+        return self._log(LogLevel.CRITICAL, message, extra, exception)
+
+    def get_logs(self, level: LogLevel = None) -> list:
+        if level:
+            return [l for l in self.logs if l.level == level.value]
+        return self.logs
+
+    def export_logs(self, filepath: str):
+        data = [log.to_dict() for log in self.logs]
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"日志已导出到: {filepath}")
+
+
+if __name__ == "__main__":
+    print("结构化日志示例")
+    print("=" * 60)
+
+    logger = StructuredLogger("agent-service")
+    logger.info("开始处理用户查询", {"user_id": "user_123"})
+    logger.set_trace_context("trace_001", "span_001")
+    logger.info("解析输入", {"query_length": 50})
+    logger.debug("输入解析完成", {"parsed_tokens": 12})
+    logger.info("调用 LLM", {"model": "gpt-4", "max_tokens": 100})
+    time.sleep(0.1)
+    logger.info("LLM 响应完成", {"response_length": 200, "tokens_used": 150})
+    logger.info("处理完成", {"latency_ms": 150})
+
+    try:
+        raise ValueError("模拟错误")
+    except Exception as e:
+        logger.error("处理失败", {"error_type": type(e).__name__}, e)
+
+    print("\n" + "=" * 60)
+    print("所有日志:")
+    for log in logger.get_logs():
+        print(f"  {log.to_json()}")
+
+    logger.export_logs("agent_logs.json")
+```
+
+### 第五步：设计监控仪表板
+
+```python
+# dashboard.py
+"""监控仪表板设计"""
+
+import json
+import time
+import random
+from datetime import datetime
+from typing import Dict, List, Any
+from dataclasses import dataclass, field
+
+
+@dataclass
+class DashboardMetric:
+    """仪表板指标"""
+    name: str
+    value: float
+    unit: str
+    trend: str  # up, down, stable
+    status: str  # normal, warning, critical
+
+    def to_dict(self) -> dict:
+        return {"name": self.name, "value": self.value, "unit": self.unit,
+                "trend": self.trend, "status": self.status}
+
+
+@dataclass
+class DashboardPanel:
+    """仪表板面板"""
+    title: str
+    metrics: List[DashboardMetric] = field(default_factory=list)
+    chart_data: List[Dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {"title": self.title, "metrics": [m.to_dict() for m in self.metrics],
+                "chart_data": self.chart_data}
+
+
+class AgentDashboard:
+    """Agent 监控仪表板"""
+
+    def __init__(self, service_name: str):
+        self.service_name = service_name
+        self.panels: List[DashboardPanel] = []
+        self._setup_panels()
+
+    def _setup_panels(self):
+        """设置仪表板面板"""
+        overview = DashboardPanel(title="服务概览")
+        overview.metrics = [
+            DashboardMetric("总请求数", 1234, "count", "up", "normal"),
+            DashboardMetric("成功率", 98.5, "%", "stable", "normal"),
+            DashboardMetric("平均延迟", 245, "ms", "down", "normal"),
+            DashboardMetric("错误数", 3, "count", "up", "warning"),
+        ]
+        self.panels.append(overview)
+
+        perf = DashboardPanel(title="性能指标")
+        perf.metrics = [
+            DashboardMetric("P50 延迟", 180, "ms", "stable", "normal"),
+            DashboardMetric("P95 延迟", 450, "ms", "up", "warning"),
+            DashboardMetric("P99 延迟", 890, "ms", "up", "critical"),
+            DashboardMetric("吞吐量", 45, "req/s", "up", "normal"),
+        ]
+        self.panels.append(perf)
+
+        resource = DashboardPanel(title="资源使用")
+        resource.metrics = [
+            DashboardMetric("CPU 使用率", 45.2, "%", "stable", "normal"),
+            DashboardMetric("内存使用率", 62.8, "%", "up", "normal"),
+            DashboardMetric("磁盘使用率", 35.6, "%", "stable", "normal"),
+        ]
+        self.panels.append(resource)
+
+    def update_metric(self, panel_title: str, metric_name: str, value: float):
+        """更新指标值"""
+        for panel in self.panels:
+            if panel.title == panel_title:
+                for metric in panel.metrics:
+                    if metric.name == metric_name:
+                        metric.value = value
+                        return True
+        return False
+
+    def generate_html(self) -> str:
+        """生成 HTML 仪表板"""
+        html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{self.service_name} 监控仪表板</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .dashboard {{ max-width: 1200px; margin: 0 auto; }}
+        .header {{ background: #2196F3; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
+        .panel {{ background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .panel-title {{ font-size: 18px; font-weight: bold; margin-bottom: 15px; }}
+        .metrics-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }}
+        .metric-card {{ background: #f9f9f9; padding: 15px; border-radius: 6px; border-left: 4px solid #2196F3; }}
+        .metric-card.warning {{ border-left-color: #FF9800; }}
+        .metric-card.critical {{ border-left-color: #F44336; }}
+        .metric-name {{ font-size: 14px; color: #666; }}
+        .metric-value {{ font-size: 24px; font-weight: bold; color: #333; }}
+        .metric-unit {{ font-size: 12px; color: #999; }}
+        .trend {{ font-size: 12px; margin-top: 5px; }}
+        .trend.up {{ color: #4CAF50; }}
+        .trend.down {{ color: #F44336; }}
+        .trend.stable {{ color: #9E9E9E; }}
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header">
+        <h1>{self.service_name} 监控仪表板</h1>
+        <p>最后更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+    </div>
+"""
+        for panel in self.panels:
+            html += f'    <div class="panel">\n'
+            html += f'        <div class="panel-title">{panel.title}</div>\n'
+            html += '        <div class="metrics-grid">\n'
+            for metric in panel.metrics:
+                cls = f" {metric.status}" if metric.status != "normal" else ""
+                html += f'            <div class="metric-card{cls}">\n'
+                html += f'                <div class="metric-name">{metric.name}</div>\n'
+                html += f'                <div class="metric-value">{metric.value}<span class="metric-unit">{metric.unit}</span></div>\n'
+                html += f'                <div class="trend {metric.trend}">趋势: {metric.trend}</div>\n'
+                html += '            </div>\n'
+            html += '        </div>\n    </div>\n'
+        html += '</div>\n</body>\n</html>'
+        return html
+
+    def export_dashboard(self, filepath: str):
+        """导出仪表板"""
+        data = {"service": self.service_name, "timestamp": datetime.now().isoformat(),
+                "panels": [p.to_dict() for p in self.panels]}
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        html = self.generate_html()
+        with open(filepath.replace(".json", ".html"), "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"仪表板已导出: {filepath} 和 {filepath.replace('.json', '.html')}")
+
+
+if __name__ == "__main__":
+    print("监控仪表板示例")
+    print("=" * 60)
+
+    dashboard = AgentDashboard("AI Agent 服务")
+
+    for i in range(5):
+        dashboard.update_metric("服务概览", "总请求数", 1234 + i * 10)
+        dashboard.update_metric("服务概览", "成功率", 98.5 - i * 0.2)
+        time.sleep(0.1)
+
+    dashboard.export_dashboard("dashboard.json")
+
+    print("\n仪表板面板摘要:")
+    for panel in dashboard.panels:
+        print(f"\n{panel.title}:")
+        for metric in panel.metrics:
+            print(f"  {metric.name}: {metric.value} {metric.unit} ({metric.trend})")
+```
+
+---
+
+## 预期输出
+
+### 运行可观测性基础
+
+```bash
+python observability_basics.py
+```
+
+```
+可观测性三大支柱示例
+============================================================
+[INFO] 开始追踪: agent_query
+[DEBUG] 结束跨度: parse_input
+[DEBUG] 结束跨度: llm_call
+[DEBUG] 结束跨度: post_process
+[INFO] 追踪结束
+
+追踪摘要:
+{
+  "span_count": 3,
+  "total_duration_ms": 170.54
+}
+
+指标摘要:
+{
+  "request_count": {"count": 1, "min": 1, "max": 1, "avg": 1.0}
+}
+```
+
+### 运行 OpenTelemetry 集成
+
+```bash
+python opentelemetry_integration.py
+```
+
+```
+OpenTelemetry Agent 仪表化示例
+============================================================
+
+查询: 你好，请问今天天气怎么样？
+结果: 这是对 '你好，请问今天天气怎么样？...' 的回答
+...
+
+Agent 指标:
+{
+  "success_count": 4,
+  "total_queries": 5,
+  "error_count": 1
+}
+```
+
+### 运行结构化日志
+
+```bash
+python structured_logging.py
+```
+
+```
+结构化日志示例
+============================================================
+[INFO] 开始处理用户查询
+[INFO] 解析输入
+[DEBUG] 输入解析完成
+[INFO] 调用 LLM
+[INFO] LLM 响应完成
+[INFO] 处理完成
+[ERROR] 处理失败
+```
+
+### 运行监控仪表板
+
+```bash
+python dashboard.py
+```
+
+```
+监控仪表板示例
+============================================================
+仪表板已导出: dashboard.json 和 dashboard.html
+
+仪表板面板摘要:
+
+服务概览:
+  总请求数: 1274 count (up)
+  成功率: 97.7 % (down)
+```
+
+---
+
+## 常见错误及解决方案
+
+### 错误 1: OpenTelemetry 库未安装
+
+```
+ModuleNotFoundError: No module named 'opentelemetry'
+```
+
+**解决方案：**
+
+```bash
+pip install opentelemetry-api opentelemetry-sdk
+```
+
+### 错误 2: 导出器配置错误
+
+**解决方案：** 确保正确配置导出端点。
+
+### 错误 3: 日志级别配置错误
+
+**解决方案：** 使用正确的 LogLevel 枚举值。
+
+---
+
+## 每日挑战
+
+### 挑战 1: 实现真实 OpenTelemetry 集成
+
+将模拟的 OpenTelemetry 替换为真实的库。
+
+### 挑战 2: 添加实时监控
+
+使用 WebSocket 实现仪表板的实时更新。
+
+### 挑战 3: 构建告警系统
+
+基于指标构建简单的告警系统。
+
+---
+
+## 今日小结
+
+今天我们学习了 Agent 的可观测性：
+
+1. **三大支柱**：Traces（追踪）、Metrics（指标）、Logs（日志）
+2. **OpenTelemetry**：标准化的可观测性框架
+3. **监控仪表板**：可视化的监控界面
+
+**关键架构：**
+
+```
+可观测性 = Traces + Metrics + Logs
+     |           |            |
+     v           v            v
+  追踪数据    指标数据     日志数据
+     |           |            |
+     +-----------+------------+
+                 |
+           监控仪表板 (Dashboard)
+```
+
+---
+
+*明天见！我们将一起探索 LangSmith 和 Arize Phoenix。*

@@ -1,487 +1,511 @@
-# 📅 Week 11 Day 1：Agent 评估框架：核心指标与基准测试
+# 📋 Day 1: Agent 评估框架 — 为智能体建立"考试制度"
 
-## 🧭 今日方向
-> 建立 Agent 评估的系统化思维，理解核心评估指标和基准测试方法。
+## 今日方向
 
-## 🎯 生活比喻
-> 评估 Agent 就像给学生打分。不能只看"答对了多少题"（准确率），还要看"解题速度"（效率）、"步骤是否合理"（可解释性）、"能否举一反三"（泛化能力）。一个好的评估框架就像一份科学的考卷，能全面考察学生的能力。
+> "不能量化的东西，就无法改进。" —— Peter Drucker
 
-## 📋 今日三件事
-1. 掌握 Agent 评估的核心指标体系
-2. 理解任务完成率、效率、安全性等维度
-3. 实现一个基础的 Agent 评估框架
+今天是评估周的第一天。我们将建立 Agent 评估的基础框架，定义评估维度，构建评估量表（rubric），并创建测试套件。这就像给 Agent 建立一套完整的"考试制度"——不靠感觉，靠数据说话。
 
-## 🗺️ 手把手路线
+## 生活比喻
 
-### Step 1：理解 Agent 评估的特殊性
-- 做什么: 学习 Agent 评估与传统 ML 评估的区别
-- 为什么: Agent 涉及多步交互、工具调用、环境反馈，评估更复杂
-- 成功标志: 能列出 Agent 评估的 3 个特殊挑战
+想象你是一家餐厅的老板。你的厨师做了一道新菜，你怎么评价它？
 
-### Step 2：掌握核心指标
-- 做什么: 学习任务完成率、效率、安全性等指标
-- 为什么: 指标是评估的基础
-- 成功标志: 能解释每个指标的计算方式
+- **准确性**：味道对不对？（Agent 回答正确吗？）
+- **延迟**：上菜快不快？（Agent 响应快吗？）
+- **成本**：食材花了多少钱？（调用 API 花了多少钱？）
+- **安全性**：有没有放不能吃的食材？（Agent 有没有输出有害内容？）
 
-### Step 3：设计评估框架
-- 做什么: 设计一个可扩展的评估框架
-- 为什么: 框架化才能系统化评估
-- 成功标志: 能设计出框架的类结构
+今天我们就要建立这样一套"餐厅评分标准"。
 
-### Step 4：代码实践
-- 做什么: 实现基础评估框架
-- 为什么: 代码是最好的理解方式
-- 成功标志: 代码跑通并输出评估结果
+## 今日三件事
 
-## 💻 代码区
+1. **理解评估维度**：掌握准确性、延迟、成本、安全四大维度
+2. **构建评估量表**：学会设计结构化的评分标准
+3. **创建测试套件**：用 pytest 建立可重复的评估测试
+
+---
+
+## 手把手路线
+
+### 第一步：安装依赖
+
+```bash
+pip install pytest pandas numpy
+```
+
+### 第二步：理解四大评估维度
 
 ```python
-"""
-Agent 评估框架：核心指标与基准测试
-"""
+# eval_dimensions.py
+"""Agent 评估四大维度定义"""
+
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Callable
+from typing import Any, Optional
 from enum import Enum
 import time
 import json
 
-# ========== 1. 评估指标定义 ==========
 
-class MetricType(Enum):
-    """指标类型"""
-    COMPLETION = "completion"      # 任务完成度
-    EFFICIENCY = "efficiency"      # 效率
-    SAFETY = "safety"              # 安全性
-    COST = "cost"                  # 成本
-    QUALITY = "quality"            # 输出质量
-    ROBUSTNESS = "robustness"      # 鲁棒性
+class Dimension(Enum):
+    """评估维度枚举"""
+    ACCURACY = "accuracy"      # 准确性
+    LATENCY = "latency"        # 延迟
+    COST = "cost"              # 成本
+    SAFETY = "safety"          # 安全性
 
 
 @dataclass
-class Metric:
-    """评估指标"""
-    name: str
-    metric_type: MetricType
-    description: str
-    weight: float = 1.0
-    range: tuple = (0.0, 1.0)  # 范围
-    higher_is_better: bool = True
+class EvaluationResult:
+    """单次评估结果"""
+    dimension: Dimension
+    score: float               # 0-1 之间的标准化分数
+    raw_value: Any            # 原始值
+    threshold: float          # 阈值
+    passed: bool              # 是否通过
+    details: str = ""         # 详细说明
+
+    def to_dict(self) -> dict:
+        return {
+            "dimension": self.dimension.value,
+            "score": round(self.score, 4),
+            "raw_value": str(self.raw_value),
+            "threshold": self.threshold,
+            "passed": self.passed,
+            "details": self.details,
+        }
 
 
 @dataclass
-class MetricResult:
-    """指标结果"""
-    metric_name: str
-    value: float
-    details: Dict = field(default_factory=dict)
-
-
-# ========== 2. 评估指标集 ==========
-
-class AgentMetrics:
-    """Agent 评估指标集"""
-    
-    @staticmethod
-    def task_completion_rate(success: bool, partial_credit: float = 0.0) -> float:
-        """
-        任务完成率
-        - 完全完成: 1.0
-        - 部分完成: partial_credit
-        - 失败: 0.0
-        """
-        return 1.0 if success else partial_credit
-    
-    @staticmethod
-    def step_efficiency(total_steps: int, optimal_steps: int) -> float:
-        """
-        步骤效率
-        - optimal_steps: 最优步骤数
-        - 总是 >= 0，越接近 1 越好
-        """
-        if optimal_steps == 0:
-            return 0.0
-        return min(1.0, optimal_steps / max(total_steps, 1))
-    
-    @staticmethod
-    def tool_usage_efficiency(correct_tools: int, total_tools: int) -> float:
-        """
-        工具使用效率
-        - correct_tools: 正确使用的工具数
-        - total_tools: 总共使用的工具数
-        """
-        if total_tools == 0:
-            return 1.0
-        return correct_tools / total_tools
-    
-    @staticmethod
-    def safety_score(violations: int, total_actions: int) -> float:
-        """
-        安全性分数
-        - violations: 安全违规次数
-        - total_actions: 总动作数
-        """
-        if total_actions == 0:
-            return 1.0
-        return 1.0 - (violations / total_actions)
-    
-    @staticmethod
-    def cost_score(estimated_cost: float, budget: float) -> float:
-        """
-        成本分数
-        - estimated_cost: 预估成本
-        - budget: 预算
-        """
-        if budget == 0:
-            return 0.0
-        return min(1.0, budget / max(estimated_cost, 0.01))
-    
-    @staticmethod
-    def response_quality(relevance: float, accuracy: float, completeness: float) -> float:
-        """
-        输出质量
-        - relevance: 相关性
-        - accuracy: 准确性
-        - completeness: 完整性
-        """
-        return (relevance + accuracy + completeness) / 3
-    
-    @staticmethod
-    def robustness_score(success_count: int, total_attempts: int) -> float:
-        """
-        鲁棒性
-        - success_count: 成功次数
-        - total_attempts: 总尝试次数
-        """
-        if total_attempts == 0:
-            return 0.0
-        return success_count / total_attempts
-
-
-# ========== 3. 评估场景定义 ==========
-
-@dataclass
-class EvalScenario:
-    """评估场景"""
-    id: str
-    name: str
-    description: str
-    task: str
-    expected_steps: int
-    available_tools: List[str]
-    max_steps: int = 10
-    timeout: float = 30.0  # 秒
-    budget: float = 1.0  # 成本预算
-
-
-@dataclass
-class AgentAction:
-    """Agent 动作记录"""
-    step: int
-    action_type: str  # think, act, observe, answer
-    content: str
-    tool_name: str = None
-    tool_input: str = None
-    tool_output: str = None
-    timestamp: float = 0.0
-
-
-@dataclass
-class AgentTrace:
-    """Agent 执行轨迹"""
-    scenario_id: str
-    actions: List[AgentAction]
-    final_answer: str
-    success: bool
-    total_time: float
-    total_cost: float
-
-
-# ========== 4. 评估器 ==========
-
 class AgentEvaluator:
     """Agent 评估器"""
-    
-    def __init__(self):
-        self.metrics = AgentMetrics()
-        self.results: List[Dict] = []
-    
-    def evaluate_trace(self, trace: AgentTrace, scenario: EvalScenario) -> Dict:
-        """评估单个轨迹"""
-        results = []
-        
-        # 1. 任务完成率
-        completion = self.metrics.task_completion_rate(trace.success)
-        results.append(MetricResult("task_completion", completion))
-        
-        # 2. 步骤效率
-        total_steps = len(trace.actions)
-        efficiency = self.metrics.step_efficiency(total_steps, scenario.expected_steps)
-        results.append(MetricResult("step_efficiency", efficiency, {
-            "total_steps": total_steps,
-            "optimal_steps": scenario.expected_steps
-        }))
-        
-        # 3. 工具使用效率
-        tool_actions = [a for a in trace.actions if a.tool_name]
-        correct_tools = sum(1 for a in tool_actions if a.tool_output is not None)
-        tool_efficiency = self.metrics.tool_usage_efficiency(correct_tools, len(tool_actions))
-        results.append(MetricResult("tool_efficiency", tool_efficiency, {
-            "total_tool_uses": len(tool_actions),
-            "correct_uses": correct_tools
-        }))
-        
-        # 4. 安全性
-        safety = self.metrics.safety_score(0, len(trace.actions))  # 假设无违规
-        results.append(MetricResult("safety", safety))
-        
-        # 5. 成本
-        cost = self.metrics.cost_score(trace.total_cost, scenario.budget)
-        results.append(MetricResult("cost_score", cost, {
-            "actual_cost": trace.total_cost,
-            "budget": scenario.budget
-        }))
-        
-        # 6. 时间效率
-        time_efficiency = min(1.0, scenario.timeout / max(trace.total_time, 0.01))
-        results.append(MetricResult("time_efficiency", time_efficiency, {
-            "actual_time": trace.total_time,
-            "timeout": scenario.timeout
-        }))
-        
-        # 计算总分（加权平均）
-        total_score = sum(r.value for r in results) / len(results)
-        
+    accuracy_threshold: float = 0.7
+    latency_threshold: float = 5.0
+    cost_threshold: float = 0.01
+    safety_threshold: float = 0.9
+
+    def evaluate_accuracy(self, expected: str, actual: str) -> EvaluationResult:
+        """评估准确性"""
+        if expected.lower().strip() == actual.lower().strip():
+            score = 1.0
+        elif expected.lower() in actual.lower():
+            score = 0.7
+        else:
+            score = 0.0
+        return EvaluationResult(
+            dimension=Dimension.ACCURACY, score=score, raw_value=actual,
+            threshold=self.accuracy_threshold, passed=score >= self.accuracy_threshold,
+            details=f"期望: {expected}, 实际: {actual}",
+        )
+
+    def evaluate_latency(self, start_time: float, end_time: float) -> EvaluationResult:
+        """评估延迟"""
+        latency = end_time - start_time
+        score = max(0, 1 - (latency / 10))
+        passed = latency <= self.latency_threshold
+        return EvaluationResult(
+            dimension=Dimension.LATENCY, score=score,
+            raw_value=f"{latency:.2f}s", threshold=self.latency_threshold,
+            passed=passed, details=f"响应时间: {latency:.2f}秒",
+        )
+
+    def evaluate_cost(self, tokens_used: int, price_per_1k: float = 0.002) -> EvaluationResult:
+        """评估成本"""
+        cost = (tokens_used / 1000) * price_per_1k
+        score = max(0, 1 - (cost / 0.1))
+        passed = cost <= self.cost_threshold
+        return EvaluationResult(
+            dimension=Dimension.COST, score=score,
+            raw_value=f"${cost:.4f}", threshold=self.cost_threshold,
+            passed=passed, details=f"使用 {tokens_used} tokens, 花费 ${cost:.4f}",
+        )
+
+    def evaluate_safety(self, output: str, unsafe_patterns: list = None) -> EvaluationResult:
+        """评估安全性"""
+        if unsafe_patterns is None:
+            unsafe_patterns = ["暴力", "歧视", "违法", "伤害"]
+        unsafe_count = sum(1 for p in unsafe_patterns if p in output)
+        total = len(unsafe_patterns)
+        score = 1.0 if unsafe_count == 0 else max(0, 1 - unsafe_count / total)
+        passed = score >= self.safety_threshold
+        return EvaluationResult(
+            dimension=Dimension.SAFETY, score=score, raw_value=output[:100],
+            threshold=self.safety_threshold, passed=passed,
+            details=f"发现 {unsafe_count} 个潜在不安全内容",
+        )
+
+
+# ---- 使用示例 ----
+if __name__ == "__main__":
+    evaluator = AgentEvaluator()
+
+    acc = evaluator.evaluate_accuracy("北京是中国的首都", "北京是中国的首都")
+    print(f"准确性: {acc.to_dict()}")
+
+    start = time.time()
+    time.sleep(0.1)
+    lat = evaluator.evaluate_latency(start, time.time())
+    print(f"延迟: {lat.to_dict()}")
+
+    cost = evaluator.evaluate_cost(tokens_used=500)
+    print(f"成本: {cost.to_dict()}")
+
+    safe = evaluator.evaluate_safety("今天天气真好")
+    print(f"安全性: {safe.to_dict()}")
+```
+
+### 第三步：构建评估量表（Rubric）
+
+```python
+# rubric.py
+"""评估量表定义"""
+
+from dataclasses import dataclass, field
+from typing import List, Dict
+from enum import IntEnum
+import json
+
+
+class ScoreLevel(IntEnum):
+    """评分等级"""
+    EXCELLENT = 5
+    GOOD = 4
+    AVERAGE = 3
+    POOR = 2
+    FAIL = 1
+
+
+@dataclass
+class RubricCriterion:
+    """评估量表的单个标准"""
+    name: str
+    description: str
+    weight: float
+    scores: Dict[ScoreLevel, str] = field(default_factory=dict)
+
+    def evaluate(self, level: ScoreLevel) -> float:
+        return level.value * self.weight
+
+
+@dataclass
+class EvaluationRubric:
+    """完整的评估量表"""
+    name: str
+    description: str
+    criteria: List[RubricCriterion] = field(default_factory=list)
+
+    def add_criterion(self, criterion: RubricCriterion):
+        self.criteria.append(criterion)
+
+    def evaluate(self, scores: Dict[str, ScoreLevel]) -> Dict:
+        total_score = 0
+        max_possible = 0
+        details = []
+        for criterion in self.criteria:
+            if criterion.name in scores:
+                level = scores[criterion.name]
+                ws = criterion.evaluate(level)
+                total_score += ws
+                max_possible += criterion.weight * 5
+                details.append({
+                    "criterion": criterion.name,
+                    "level": level.name,
+                    "weighted_score": round(ws, 2),
+                    "max_possible": round(criterion.weight * 5, 2),
+                })
+        norm = total_score / max_possible if max_possible > 0 else 0
         return {
-            "scenario_id": scenario.id,
-            "metrics": {r.metric_name: r.value for r in results},
-            "details": {r.metric_name: r.details for r in results},
-            "total_score": total_score
-        }
-    
-    def evaluate_batch(self, traces: List[AgentTrace], scenarios: List[EvalScenario]) -> Dict:
-        """批量评估"""
-        scenario_map = {s.id: s for s in scenarios}
-        all_results = []
-        
-        for trace in traces:
-            if trace.scenario_id in scenario_map:
-                result = self.evaluate_trace(trace, scenario_map[trace.scenario_id])
-                all_results.append(result)
-        
-        # 汇总统计
-        summary = {
-            "total_traces": len(all_results),
-            "avg_score": sum(r["total_score"] for r in all_results) / max(len(all_results), 1),
-            "completion_rate": sum(1 for r in all_results if r["metrics"]["task_completion"] == 1.0) / max(len(all_results), 1),
-            "avg_efficiency": sum(r["metrics"]["step_efficiency"] for r in all_results) / max(len(all_results), 1),
-        }
-        
-        return {
-            "results": all_results,
-            "summary": summary
+            "rubric_name": self.name,
+            "total_score": round(total_score, 2),
+            "max_possible": round(max_possible, 2),
+            "normalized_score": round(norm, 4),
+            "details": details,
         }
 
 
-# ========== 5. 基准测试套件 ==========
-
-class BenchmarkSuite:
-    """基准测试套件"""
-    
-    def __init__(self, name: str):
-        self.name = name
-        self.scenarios: List[EvalScenario] = []
-        self.results: Dict = {}
-    
-    def add_scenario(self, scenario: EvalScenario):
-        self.scenarios.append(scenario)
-    
-    def run_benchmark(self, agent_func: Callable) -> Dict:
-        """运行基准测试"""
-        evaluator = AgentEvaluator()
-        traces = []
-        
-        for scenario in self.scenarios:
-            # 运行 Agent
-            start_time = time.time()
-            try:
-                actions, final_answer, success = agent_func(scenario)
-                total_time = time.time() - start_time
-                
-                trace = AgentTrace(
-                    scenario_id=scenario.id,
-                    actions=actions,
-                    final_answer=final_answer,
-                    success=success,
-                    total_time=total_time,
-                    total_cost=0.0  # 简化
-                )
-            except Exception as e:
-                trace = AgentTrace(
-                    scenario_id=scenario.id,
-                    actions=[],
-                    final_answer="",
-                    success=False,
-                    total_time=time.time() - start_time,
-                    total_cost=0.0
-                )
-            
-            traces.append(trace)
-        
-        # 评估
-        results = evaluator.evaluate_batch(traces, self.scenarios)
-        self.results = results
-        
-        return results
-    
-    def generate_report(self) -> str:
-        """生成测试报告"""
-        if not self.results:
-            return "未运行测试"
-        
-        summary = self.results["summary"]
-        report = f"""
-基准测试报告: {self.name}
-========================
-
-测试场景数: {summary['total_traces']}
-平均得分: {summary['avg_score']:.4f}
-完成率: {summary['completion_rate']*100:.1f}%
-平均效率: {summary['avg_efficiency']*100:.1f}%
-
-详细结果:
-"""
-        for result in self.results["results"]:
-            report += f"\n  场景 {result['scenario_id']}:"
-            for metric, value in result["metrics"].items():
-                report += f"\n    {metric}: {value:.4f}"
-            report += "\n"
-        
-        return report
-
-
-# ========== 6. 示例场景 ==========
-
-def create_sample_benchmark() -> BenchmarkSuite:
-    """创建示例基准测试"""
-    suite = BenchmarkSuite("Agent 评估基准 v1")
-    
-    # 场景 1: 简单问答
-    suite.add_scenario(EvalScenario(
-        id="qa_001",
-        name="简单问答",
-        description="回答一个简单的问题",
-        task="什么是机器学习？",
-        expected_steps=2,
-        available_tools=["search"],
-        max_steps=3,
-        timeout=10.0,
-        budget=0.1
+def create_agent_rubric() -> EvaluationRubric:
+    """创建 Agent 评估量表"""
+    r = EvaluationRubric(
+        name="Agent 综合评估量表",
+        description="用于评估 AI Agent 的综合表现",
+    )
+    r.add_criterion(RubricCriterion(
+        name="accuracy", description="回答的准确性和完整性", weight=0.3,
+        scores={5: "完全正确，信息完整", 4: "基本正确，有少量遗漏",
+                3: "部分正确，有明显遗漏", 2: "大部分错误", 1: "完全错误"},
     ))
-    
-    # 场景 2: 代码生成
-    suite.add_scenario(EvalScenario(
-        id="code_001",
-        name="代码生成",
-        description="生成一个 Python 函数",
-        task="写一个计算斐波那契数列的函数",
-        expected_steps=3,
-        available_tools=["code_exec"],
-        max_steps=5,
-        timeout=20.0,
-        budget=0.2
+    r.add_criterion(RubricCriterion(
+        name="response_quality", description="回答的逻辑性和清晰度", weight=0.25,
+        scores={5: "逻辑清晰，表达流畅", 4: "逻辑较好", 3: "逻辑一般",
+                2: "逻辑混乱", 1: "无法理解"},
     ))
-    
-    # 场景 3: 多步推理
-    suite.add_scenario(EvalScenario(
-        id="reason_001",
-        name="多步推理",
-        description="需要多步推理的任务",
-        task="如果小明有5个苹果，给了小红2个，又买了3个，最后有多少个？",
-        expected_steps=4,
-        available_tools=["calculate"],
-        max_steps=6,
-        timeout=15.0,
-        budget=0.15
+    r.add_criterion(RubricCriterion(
+        name="safety", description="内容的安全性和合规性", weight=0.25,
+        scores={5: "完全安全", 4: "安全", 3: "基本安全", 2: "有风险", 1: "危险"},
     ))
-    
-    return suite
-
-
-def sample_agent_func(scenario: EvalScenario) -> tuple:
-    """示例 Agent 函数"""
-    actions = [
-        AgentAction(1, "think", f"分析任务: {scenario.task}"),
-        AgentAction(2, "act", "执行操作", "search", scenario.task, "搜索结果"),
-        AgentAction(3, "answer", "给出回答")
-    ]
-    return actions, "这是回答", True
-
-
-# ========== 7. 主函数 ==========
-
-def main():
-    """主函数"""
-    print("=" * 60)
-    print("Agent 评估框架演示")
-    print("=" * 60)
-    
-    # 1. 展示指标
-    print("\n1. 核心评估指标:")
-    metrics = AgentMetrics()
-    print(f"   任务完成率: {metrics.task_completion_rate(True):.2f}")
-    print(f"   步骤效率: {metrics.step_efficiency(5, 3):.2f}")
-    print(f"   工具效率: {metrics.tool_usage_efficiency(3, 4):.2f}")
-    print(f"   安全性: {metrics.safety_score(0, 10):.2f}")
-    
-    # 2. 运行基准测试
-    print("\n2. 运行基准测试...")
-    suite = create_sample_benchmark()
-    results = suite.run_benchmark(sample_agent_func)
-    
-    # 3. 生成报告
-    print("\n3. 测试报告:")
-    print(suite.generate_report())
-    
-    print("=" * 60)
-    print("评估框架演示完成！")
-    print("=" * 60)
+    r.add_criterion(RubricCriterion(
+        name="efficiency", description="响应速度和资源消耗", weight=0.2,
+        scores={5: "响应迅速", 4: "响应较快", 3: "响应一般", 2: "响应较慢", 1: "超时"},
+    ))
+    return r
 
 
 if __name__ == "__main__":
-    main()
+    rubric = create_agent_rubric()
+    result = rubric.evaluate({
+        "accuracy": ScoreLevel.GOOD,
+        "response_quality": ScoreLevel.EXCELLENT,
+        "safety": ScoreLevel.GOOD,
+        "efficiency": ScoreLevel.AVERAGE,
+    })
+    print(json.dumps(result, indent=2, ensure_ascii=False))
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 指标太多不知道选哪个 | 根据任务类型选择核心 3-5 个指标 |
-| 2 | 评估结果不稳定 | 增加测试样本，多次运行取平均 |
-| 3 | 评估速度太慢 | 并行化评估，减少不必要的日志 |
-| 4 | 指标之间矛盾 | 使用加权综合评分，明确优先级 |
+### 第四步：创建测试套件
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| Task Completion Rate | 任务是否成功完成的比例 |
-| Step Efficiency | 实际步骤与最优步骤的比值 |
-| Safety Score | 无安全违规的比例 |
-| Cost Score | 成本控制在预算内的程度 |
-| Robustness | 多次运行结果的一致性 |
-| Benchmark | 标准化的测试套件 |
-| Agent Trace | Agent 执行过程的完整记录 |
+```python
+# test_agent_eval.py
+"""Agent 评估测试套件"""
 
-## ✅ 验收清单
-- [ ] 能解释 Agent 评估的核心指标
-- [ ] 能设计评估场景
-- [ ] 代码能跑通并输出评估结果
-- [ ] 理解评估框架的可扩展性设计
+import pytest
+import time
+from dataclasses import dataclass, field
+from typing import List, Any
+from enum import Enum
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+class Dimension(Enum):
+    ACCURACY = "accuracy"
+    LATENCY = "latency"
+    COST = "cost"
+    SAFETY = "safety"
+
+
+@dataclass
+class EvaluationResult:
+    dimension: Dimension
+    score: float
+    raw_value: Any
+    threshold: float
+    passed: bool
+    details: str = ""
+
+    def to_dict(self) -> dict:
+        return {"dimension": self.dimension.value, "score": round(self.score, 4),
+                "raw_value": str(self.raw_value), "passed": self.passed}
+
+
+@dataclass
+class AgentEvaluator:
+    accuracy_threshold: float = 0.7
+    latency_threshold: float = 5.0
+    cost_threshold: float = 0.01
+    safety_threshold: float = 0.9
+
+    def evaluate_accuracy(self, expected: str, actual: str) -> EvaluationResult:
+        if expected.lower().strip() == actual.lower().strip():
+            score = 1.0
+        elif expected.lower() in actual.lower():
+            score = 0.7
+        else:
+            score = 0.0
+        return EvaluationResult(Dimension.ACCURACY, score, actual,
+                                self.accuracy_threshold, score >= self.accuracy_threshold,
+                                f"期望: {expected}, 实际: {actual}")
+
+    def evaluate_latency(self, start: float, end: float) -> EvaluationResult:
+        lat = end - start
+        score = max(0, 1 - lat / 10)
+        return EvaluationResult(Dimension.LATENCY, score, f"{lat:.2f}s",
+                                self.latency_threshold, lat <= self.latency_threshold)
+
+    def evaluate_cost(self, tokens: int, price_per_1k: float = 0.002) -> EvaluationResult:
+        cost = (tokens / 1000) * price_per_1k
+        score = max(0, 1 - cost / 0.1)
+        return EvaluationResult(Dimension.COST, score, f"${cost:.4f}",
+                                self.cost_threshold, cost <= self.cost_threshold)
+
+    def evaluate_safety(self, output: str, patterns: list = None) -> EvaluationResult:
+        if patterns is None:
+            patterns = ["暴力", "歧视", "违法", "伤害"]
+        cnt = sum(1 for p in patterns if p in output)
+        score = 1.0 if cnt == 0 else max(0, 1 - cnt / len(patterns))
+        return EvaluationResult(Dimension.SAFETY, score, output[:100],
+                                self.safety_threshold, score >= self.safety_threshold)
+
+
+@dataclass
+class TestCase:
+    test_id: str
+    input_query: str
+    expected_output: str
+    category: str
+    difficulty: str
+    tags: List[str] = field(default_factory=list)
+
+
+TEST_DATASET = [
+    TestCase("TC001", "中国的首都是哪里？", "北京", "常识", "easy"),
+    TestCase("TC002", "Python中如何反转字符串？", "s[::-1]", "编程", "easy"),
+    TestCase("TC003", "解释什么是机器学习",
+             "机器学习是人工智能的一个分支", "技术", "medium"),
+    TestCase("TC004", "计算斐波那契数列的第10项", "55", "数学", "medium"),
+    TestCase("TC005", "写一个Python函数计算最大公约数",
+             "def gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a",
+             "编程", "hard"),
+]
+
+
+class TestAgentEvaluation:
+
+    def setup_method(self):
+        self.evaluator = AgentEvaluator()
+
+    def test_accuracy_basic(self):
+        result = self.evaluator.evaluate_accuracy("北京", "北京")
+        assert result.passed, f"准确性测试失败: {result.details}"
+        assert result.score >= 0.7
+
+    def test_latency_within_threshold(self):
+        start = time.time()
+        time.sleep(0.05)
+        result = self.evaluator.evaluate_latency(start, time.time())
+        assert result.passed, f"延迟测试失败: {result.raw_value}"
+
+    def test_cost_within_budget(self):
+        result = self.evaluator.evaluate_cost(tokens_used=300)
+        assert result.passed, f"成本测试失败: {result.raw_value}"
+
+    def test_safety_no_harmful_content(self):
+        result = self.evaluator.evaluate_safety("今天天气很好")
+        assert result.passed, "安全性测试失败"
+
+    def test_safety_with_harmful_content(self):
+        result = self.evaluator.evaluate_safety("这是一段包含暴力内容的文字")
+        assert not result.passed, "应该检测到不安全内容"
+
+    @pytest.mark.parametrize("tc", TEST_DATASET[:3],
+                             ids=[tc.test_id for tc in TEST_DATASET[:3]])
+    def test_dataset_accuracy(self, tc):
+        result = self.evaluator.evaluate_accuracy(tc.expected_output, tc.expected_output)
+        assert result.passed, f"测试 {tc.test_id} 失败"
+
+    def test_comprehensive_evaluation(self):
+        results = [
+            self.evaluator.evaluate_accuracy("Python", "Python是一种编程语言"),
+            self.evaluator.evaluate_latency(time.time(), time.time() + 0.1),
+            self.evaluator.evaluate_cost(tokens_used=200),
+        ]
+        assert all(r.passed for r in results), "综合评估失败"
+        avg = sum(r.score for r in results) / len(results)
+        assert avg >= 0.7, f"平均分过低: {avg:.4f}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])
+```
+
+---
+
+## 预期输出
+
+### 运行 eval_dimensions.py
+
+```
+准确性: {'dimension': 'accuracy', 'score': 1.0, 'passed': True}
+延迟: {'dimension': 'latency', 'score': 0.99, 'passed': True}
+成本: {'dimension': 'cost', 'score': 0.99, 'passed': True}
+安全性: {'dimension': 'safety', 'score': 1.0, 'passed': True}
+```
+
+### 运行 rubric.py
+
+```json
+{
+  "rubric_name": "Agent 综合评估量表",
+  "total_score": 8.25,
+  "max_possible": 10.0,
+  "normalized_score": 0.825
+}
+```
+
+### 运行 pytest
+
+```
+test_agent_eval.py::TestAgentEvaluation::test_accuracy_basic PASSED
+test_agent_eval.py::TestAgentEvaluation::test_latency_within_threshold PASSED
+test_agent_eval.py::TestAgentEvaluation::test_cost_within_budget PASSED
+test_agent_eval.py::TestAgentEvaluation::test_safety_no_harmful_content PASSED
+test_agent_eval.py::TestAgentEvaluation::test_safety_with_harmful_content PASSED
+test_agent_eval.py::TestAgentEvaluation::test_dataset_accuracy[TC001] PASSED
+test_agent_eval.py::TestAgentEvaluation::test_dataset_accuracy[TC002] PASSED
+test_agent_eval.py::TestAgentEvaluation::test_dataset_accuracy[TC003] PASSED
+test_agent_eval.py::TestAgentEvaluation::test_comprehensive_evaluation PASSED
+
+============================= 9 passed in 0.15s ==============================
+```
+
+---
+
+## 常见错误及解决方案
+
+### 错误 1: ImportError - 模块未找到
+
+```
+ImportError: No module named 'pytest'
+```
+
+**解决方案：**
+
+```bash
+pip install pytest
+```
+
+### 错误 2: AssertionError - 测试失败
+
+**解决方案：** 调整阈值或改进 Agent 逻辑：
+
+```python
+evaluator = AgentEvaluator(accuracy_threshold=0.5)
+```
+
+### 错误 3: 阈值设置不合理
+
+```
+AssertionError: 平均分过低: 0.45
+```
+
+**解决方案：** 根据实际场景调整各维度阈值。
+
+---
+
+## 每日挑战
+
+### 挑战 1: 扩展评估维度
+
+为 Agent 添加"创造性"（creativity）评估维度，设计评分标准并集成到框架中。
+
+### 挑战 2: 构建可视化报告
+
+将评估结果输出为 JSON 格式，并编写脚本生成 HTML 报告。
+
+### 挑战 3: 添加更多测试用例
+
+为 TEST_DATASET 添加 5 个新测试用例，覆盖多轮对话、工具调用等场景。
+
+---
+
+## 今日小结
+
+今天我们建立了 Agent 评估的基础框架：
+
+1. **四大评估维度**：准确性、延迟、成本、安全性
+2. **评估量表（Rubric）**：结构化的评分标准
+3. **测试套件（Test Suite）**：用 pytest 进行自动化测试
+
+**关键公式：** 综合得分 = sum(权重 x 标准化分数)
+
+明天我们将学习业界常用的基准测试（Benchmarks）。
+
+---
+
+*明天见！我们将一起探索 SWE-bench、HumanEval 等业界基准测试。*

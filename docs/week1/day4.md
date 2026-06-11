@@ -1,433 +1,592 @@
-# 📅 Week 1 Day 4：异步编程 asyncio + 并发调用
+# Day 4: 异步编程 asyncio
 
-## 🧭 今日方向
-> 今天我们将学习 Python 的异步编程，掌握 asyncio 的核心概念，以及如何在 AI Agent 开发中应用并发技术。
+> 今天的目标：理解 Python 异步编程的核心概念，学会用 asyncio + httpx 并发调用多个 API。这是让 Agent 同时处理多个任务的关键技术。
 
-## 🎯 生活比喻
-> 异步编程就像同时做多件事：你可以一边煮咖啡，一边烤面包，而不是等咖啡煮好再烤面包。asyncio 就是那个帮你安排任务的"调度员"。
+---
 
-## 📋 今日三件事
-1. 理解异步编程的基本概念
-2. 掌握 asyncio 的核心用法
-3. 实践并发 API 调用
+## 1. 为什么要学异步编程？
 
-## 🗺️ 手把手路线
+想象你是一个客服，有 3 个客户同时打来电话：
 
-### Step 1: 异步编程基础
-- **做什么**: 理解同步 vs 异步、阻塞 vs 非阻塞
-- **为什么**: 异步是提高程序效率的关键技术
-- **成功标志**: 能解释异步编程的优势
+**同步（一个一个来）**：
+1. 接客户 A 的电话，等他讲完（5 分钟）
+2. 接客户 B 的电话，等他讲完（3 分钟）
+3. 接客户 C 的电话，等他讲完（4 分钟）
+4. 总共花了 12 分钟
 
-### Step 2: asyncio 核心语法
-- **做什么**: 学习 async/await、事件循环、协程
-- **为什么**: 这是 Python 异步编程的基础
-- **成功标志**: 能编写基本的异步程序
+**异步（同时处理）**：
+1. 接客户 A 的电话，他说要等一下查资料
+2. 在等的时候，接客户 B 的电话
+3. 在等的时候，接客户 C 的电话
+4. A 查完了，回来告诉 A
+5. 总共花了约 5 分钟
 
-### Step 3: 并发 API 调用
-- **做什么**: 使用 asyncio 并发调用多个 API
-- **为什么**: 提高 AI Agent 的响应速度
-- **成功标志**: 能同时发起多个 API 请求
+在 AI Agent 开发中，异步编程非常关键：
 
-## 💻 代码区
+- 你的 Agent 可能需要同时调用 3 个大模型（OpenAI + Claude + DeepSeek）来比较结果
+- 同时查询多个数据库
+- 同时处理多个用户的请求
+
+---
+
+## 2. 同步 vs 异步：代码对比
+
+### 2.1 同步代码：一个一个来
 
 ```python
-# 异步编程基础
+"""
+Day 4 示例：同步 vs 异步对比
+"""
 
-import asyncio
 import time
-from typing import List
+import asyncio
 
-# 1. 同步 vs 异步对比
+# ============================================
+# 同步版本：一个一个执行
+# ============================================
+
+def sync_fetch_data(url: str, delay: float) -> str:
+    """同步获取数据（模拟网络请求）"""
+    print(f"开始获取: {url}")
+    time.sleep(delay)  # 同步等待（整个程序卡住）
+    print(f"完成获取: {url}")
+    return f"来自 {url} 的数据"
+
 def sync_example():
-    """同步示例：串行执行"""
-    print("=== 同步示例 ===")
-    
-    start_time = time.time()
-    
-    def slow_task(name: str, duration: int):
-        print(f"开始任务: {name}")
-        time.sleep(duration)  # 模拟耗时操作
-        print(f"完成任务: {name}")
-    
-    # 串行执行
-    slow_task("任务1", 2)
-    slow_task("任务2", 2)
-    slow_task("任务3", 2)
-    
-    end_time = time.time()
-    print(f"总耗时: {end_time - start_time:.2f} 秒\n")
+    """同步示例"""
+    print("=== 同步版本 ===")
+    start = time.time()
+
+    # 串行执行：一个一个来
+    result1 = sync_fetch_data("API-1", 2)
+    result2 = sync_fetch_data("API-2", 1)
+    result3 = sync_fetch_data("API-3", 3)
+
+    end = time.time()
+    print(f"结果: {result1}, {result2}, {result3}")
+    print(f"总耗时: {end - start:.1f} 秒")  # 应该是 2+1+3=6 秒
+
+sync_example()
+```
+
+运行结果：
+
+```
+=== 同步版本 ===
+开始获取: API-1
+完成获取: API-1
+开始获取: API-2
+完成获取: API-2
+开始获取: API-3
+完成获取: API-3
+结果: 来自 API-1 的数据, 来自 API-2 的数据, 来自 API-3 的数据
+总耗时: 6.0 秒
+```
+
+### 2.2 异步代码：同时执行
+
+```python
+# ============================================
+# 异步版本：同时执行
+# ============================================
+
+async def async_fetch_data(url: str, delay: float) -> str:
+    """异步获取数据（模拟网络请求）"""
+    print(f"开始获取: {url}")
+    await asyncio.sleep(delay)  # 异步等待（不阻塞其他任务）
+    print(f"完成获取: {url}")
+    return f"来自 {url} 的数据"
 
 async def async_example():
-    """异步示例：并发执行"""
-    print("=== 异步示例 ===")
-    
-    start_time = time.time()
-    
-    async def slow_task(name: str, duration: int):
-        print(f"开始任务: {name}")
-        await asyncio.sleep(duration)  # 异步等待
-        print(f"完成任务: {name}")
-    
-    # 并发执行
-    await asyncio.gather(
-        slow_task("任务1", 2),
-        slow_task("任务2", 2),
-        slow_task("任务3", 2)
-    )
-    
-    end_time = time.time()
-    print(f"总耗时: {end_time - start_time:.2f} 秒")
+    """异步示例"""
+    print("\n=== 异步版本 ===")
+    start = time.time()
 
-# 2. 协程基础
-async def coroutine_example():
-    """协程基础示例"""
-    print("\n=== 协程基础 ===")
-    
-    async def fetch_data(url: str, delay: int) -> str:
-        """模拟异步数据获取"""
-        print(f"开始获取: {url}")
-        await asyncio.sleep(delay)  # 模拟网络请求
-        return f"从 {url} 获取的数据"
-    
-    # 顺序执行
-    result1 = await fetch_data("http://api1.com", 1)
-    result2 = await fetch_data("http://api2.com", 1)
-    print(f"顺序结果: {result1}, {result2}")
-    
-    # 并发执行
+    # 并发执行：同时进行
     results = await asyncio.gather(
-        fetch_data("http://api3.com", 1),
-        fetch_data("http://api4.com", 1)
+        async_fetch_data("API-1", 2),
+        async_fetch_data("API-2", 1),
+        async_fetch_data("API-3", 3)
     )
-    print(f"并发结果: {results}")
 
-# 3. 任务管理
-async def task_management():
-    """任务管理示例"""
-    print("\n=== 任务管理 ===")
-    
-    async def worker(name: str, work_time: int):
-        """工作进程"""
-        print(f"工人 {name} 开始工作")
-        await asyncio.sleep(work_time)
-        print(f"工人 {name} 完成工作")
-        return f"{name} 的工作成果"
-    
-    # 创建任务
-    tasks = [
-        asyncio.create_task(worker("Alice", 2)),
-        asyncio.create_task(worker("Bob", 1)),
-        asyncio.create_task(worker("Charlie", 3))
-    ]
-    
-    # 等待所有任务完成
-    results = await asyncio.gather(*tasks)
-    print(f"所有结果: {results}")
+    end = time.time()
+    print(f"结果: {results}")
+    print(f"总耗时: {end - start:.1f} 秒")  # 应该是 max(2,1,3)=3 秒
 
-if __name__ == "__main__":
-    # 运行同步示例
-    sync_example()
-    
-    # 运行异步示例
-    asyncio.run(async_example())
-    asyncio.run(coroutine_example())
-    asyncio.run(task_management())
+asyncio.run(async_example())
 ```
 
+运行结果：
+
+```
+=== 异步版本 ===
+开始获取: API-1
+开始获取: API-2
+开始获取: API-3
+完成获取: API-2
+完成获取: API-1
+完成获取: API-3
+结果: ['来自 API-1 的数据', '来自 API-2 的数据', '来自 API-3 的数据']
+总耗时: 3.0 秒
+```
+
+> **关键区别**：同步花了 6 秒，异步只花了 3 秒！因为异步是同时发出三个请求，只等最慢的那个。
+
+---
+
+## 3. asyncio 核心概念
+
+### 3.1 什么是协程（Coroutine）？
+
+协程就是用 `async def` 定义的函数。它和普通函数的区别：
+
 ```python
-# 并发 API 调用实战
+# 普通函数
+def normal_func():
+    return "hello"
+
+# 协程函数
+async def async_func():
+    return "hello"
+```
+
+**关键规则**：
+- 协程函数**必须用 `await` 调用**
+- 协程函数**必须在异步上下文中运行**
+
+```python
+# 错误！这样调用不会执行协程
+result = async_func()    # result 是一个协程对象，不是字符串！
+
+# 正确！用 await 调用
+result = await async_func()    # result 是 "hello"
+
+# 或者用 asyncio.run() 启动
+result = asyncio.run(async_func())    # result 是 "hello"
+```
+
+### 3.2 什么是 await？
+
+`await` 的意思是"等待这个异步操作完成"。在等待的时候，**程序可以去执行其他任务**。
+
+```python
+async def make_coffee():
+    print("开始煮咖啡...")
+    await asyncio.sleep(3)    # 等 3 秒，但不阻塞！
+    print("咖啡好了！")
+
+async def make_toast():
+    print("开始烤面包...")
+    await asyncio.sleep(2)    # 等 2 秒，但不阻塞！
+    print("面包好了！")
+
+async def main():
+    # 同时开始做咖啡和烤面包
+    await asyncio.gather(
+        make_coffee(),
+        make_toast()
+    )
+
+asyncio.run(main())
+```
+
+输出：
+
+```
+开始煮咖啡...
+开始烤面包...
+面包好了！      <-- 面包先好（2秒）
+咖啡好了！      <-- 咖啡后好（3秒）
+```
+
+### 3.3 什么是事件循环（Event Loop）？
+
+事件循环就像一个**调度员**，它：
+
+1. 检查有哪些协程需要执行
+2. 调度它们执行
+3. 当一个协程等待（await）时，切换去执行其他协程
+4. 当等待完成时，回来继续执行
+
+```python
+# asyncio.run() 就是启动事件循环
+asyncio.run(main())
+```
+
+### 3.4 asyncio.gather() vs asyncio.create_task()
+
+```python
+# ============================================
+# 方式 1：asyncio.gather（推荐用于简单场景）
+# ============================================
+
+async def main():
+    results = await asyncio.gather(
+        fetch_data("url1"),
+        fetch_data("url2"),
+        fetch_data("url3")
+    )
+    # results 是一个列表，按顺序对应输入
+
+# ============================================
+# 方式 2：asyncio.create_task（推荐用于复杂场景）
+# ============================================
+
+async def main():
+    # 创建任务（任务会立即开始执行）
+    task1 = asyncio.create_task(fetch_data("url1"))
+    task2 = asyncio.create_task(fetch_data("url2"))
+    task3 = asyncio.create_task(fetch_data("url3"))
+
+    # 等待所有任务完成
+    results = await asyncio.gather(task1, task2, task3)
+
+    # 在等待过程中，可以做其他事情
+    print("所有任务都在进行中...")
+```
+
+---
+
+## 4. 用 asyncio + httpx 并发调用 API
+
+### 4.1 并发调用大模型 API
+
+这是实际项目中最常见的场景：
+
+```python
+"""
+Day 4 示例：并发调用多个大模型 API
+"""
 
 import asyncio
-import httpx
 import time
+import httpx
 from typing import List, Dict
 from dataclasses import dataclass
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 @dataclass
-class APIResponse:
-    """API 响应数据类"""
-    url: str
-    status_code: int
-    data: Dict
-    response_time: float
+class LLMResponse:
+    """LLM 响应"""
+    provider: str
+    content: str
+    latency: float
+    tokens: int
 
-async def fetch_api_data(
+async def call_openai(
     client: httpx.AsyncClient,
-    url: str,
-    delay: float = 0.1
-) -> APIResponse:
-    """
-    异步获取 API 数据
-    
-    Args:
-        client: httpx 异步客户端
-        url: API URL
-        delay: 模拟延迟
-        
-    Returns:
-        API 响应对象
-    """
-    start_time = time.time()
-    
-    try:
-        # 模拟 API 请求
-        await asyncio.sleep(delay)
-        
-        # 实际请求（取消注释使用真实 API）
-        # response = await client.get(url)
-        # return APIResponse(
-        #     url=url,
-        #     status_code=response.status_code,
-        #     data=response.json(),
-        #     response_time=time.time() - start_time
-        # )
-        
-        # 模拟响应
-        return APIResponse(
-            url=url,
-            status_code=200,
-            data={"message": f"来自 {url} 的数据"},
-            response_time=time.time() - start_time
-        )
-    
-    except Exception as e:
-        return APIResponse(
-            url=url,
-            status_code=500,
-            data={"error": str(e)},
-            response_time=time.time() - start_time
-        )
+    prompt: str
+) -> LLMResponse:
+    """异步调用 OpenAI"""
+    start = time.time()
 
-async def concurrent_api_calls(urls: List[str]) -> List[APIResponse]:
-    """
-    并发调用多个 API
-    
-    Args:
-        urls: API URL 列表
-        
-    Returns:
-        响应列表
-    """
+    response = await client.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 200
+        },
+        timeout=30.0
+    )
+
+    data = response.json()
+    latency = time.time() - start
+
+    return LLMResponse(
+        provider="OpenAI",
+        content=data["choices"][0]["message"]["content"],
+        latency=latency,
+        tokens=data["usage"]["total_tokens"]
+    )
+
+async def call_anthropic(
+    client: httpx.AsyncClient,
+    prompt: str
+) -> LLMResponse:
+    """异步调用 Anthropic"""
+    start = time.time()
+
+    response = await client.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": os.getenv("ANTHROPIC_API_KEY"),
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 200,
+            "messages": [{"role": "user", "content": prompt}]
+        },
+        timeout=30.0
+    )
+
+    data = response.json()
+    latency = time.time() - start
+
+    return LLMResponse(
+        provider="Anthropic",
+        content=data["content"][0]["text"],
+        latency=latency,
+        tokens=data["usage"]["input_tokens"] + data["usage"]["output_tokens"]
+    )
+
+async def call_deepseek(
+    client: httpx.AsyncClient,
+    prompt: str
+) -> LLMResponse:
+    """异步调用 DeepSeek"""
+    start = time.time()
+
+    response = await client.post(
+        "https://api.deepseek.com/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 200
+        },
+        timeout=30.0
+    )
+
+    data = response.json()
+    latency = time.time() - start
+
+    return LLMResponse(
+        provider="DeepSeek",
+        content=data["choices"][0]["message"]["content"],
+        latency=latency,
+        tokens=data["usage"]["total_tokens"]
+    )
+
+async def compare_llms(prompt: str) -> List[LLMResponse]:
+    """并发调用多个 LLM 并比较结果"""
+    print(f"Prompt: {prompt}\n")
+
     async with httpx.AsyncClient() as client:
-        # 创建任务列表
-        tasks = [fetch_api_data(client, url) for url in urls]
-        
-        # 并发执行
-        responses = await asyncio.gather(*tasks)
-        
-        return responses
+        start = time.time()
 
-async def rate_limited_concurrent_calls(
-    urls: List[str],
-    max_concurrent: int = 5
-) -> List[APIResponse]:
-    """
-    带并发限制的 API 调用
-    
-    Args:
-        urls: API URL 列表
-        max_concurrent: 最大并发数
-        
-    Returns:
-        响应列表
-    """
-    semaphore = asyncio.Semaphore(max_concurrent)
-    
-    async def limited_fetch(client: httpx.AsyncClient, url: str):
-        async with semaphore:
-            return await fetch_api_data(client, url)
-    
-    async with httpx.AsyncClient() as client:
-        tasks = [limited_fetch(client, url) for url in urls]
-        responses = await asyncio.gather(*tasks)
-        return responses
+        # 并发调用三个 LLM
+        tasks = [
+            call_openai(client, prompt),
+            call_anthropic(client, prompt),
+            call_deepseek(client, prompt)
+        ]
 
-# 实战示例：并发获取多个用户信息
-async def fetch_user_profiles(user_ids: List[int]) -> List[Dict]:
-    """并发获取多个用户信息"""
-    
-    async def fetch_user(user_id: int) -> Dict:
-        # 模拟 API 调用
-        await asyncio.sleep(0.1)
-        return {
-            "id": user_id,
-            "name": f"用户{user_id}",
-            "email": f"user{user_id}@example.com"
-        }
-    
-    tasks = [fetch_user(user_id) for user_id in user_ids]
-    users = await asyncio.gather(*tasks)
-    return users
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
 
+        total_time = time.time() - start
+
+        # 处理结果
+        results = []
+        for response in responses:
+            if isinstance(response, Exception):
+                print(f"错误: {response}")
+            else:
+                results.append(response)
+                print(f"[{response.provider}]")
+                print(f"  回复: {response.content[:100]}...")
+                print(f"  延迟: {response.latency:.2f}s")
+                print(f"  Token: {response.tokens}")
+                print()
+
+        print(f"总耗时: {total_time:.2f}s")
+
+        return results
+
+# 运行
 if __name__ == "__main__":
-    # 测试并发 API 调用
-    urls = [
-        "https://api.example.com/user1",
-        "https://api.example.com/user2",
-        "https://api.example.com/user3",
-        "https://api.example.com/user4",
-        "https://api.example.com/user5"
-    ]
-    
-    print("=== 并发 API 调用 ===")
-    start_time = time.time()
-    
-    responses = asyncio.run(concurrent_api_calls(urls))
-    
-    for response in responses:
-        print(f"URL: {response.url}, 状态: {response.status_code}, 耗时: {response.response_time:.3f}s")
-    
-    total_time = time.time() - start_time
-    print(f"总耗时: {total_time:.3f} 秒")
-    
-    # 测试带限制的并发调用
-    print("\n=== 带并发限制的调用 ===")
-    responses = asyncio.run(rate_limited_concurrent_calls(urls, max_concurrent=2))
-    
-    for response in responses:
-        print(f"URL: {response.url}, 状态: {response.status_code}")
+    asyncio.run(compare_llms("用一句话解释什么是人工智能"))
 ```
+
+### 4.2 并发调用的错误处理
+
+当并发调用多个 API 时，某个 API 可能失败。我们需要优雅地处理：
 
 ```python
-# 异步上下文管理器和生成器
+# ============================================
+# 带错误处理的并发调用
+# ============================================
 
-import asyncio
-from typing import AsyncGenerator, AsyncContextManager
-from contextlib import asynccontextmanager
-
-# 1. 异步上下文管理器
-class AsyncDatabaseConnection:
-    """异步数据库连接示例"""
-    
-    def __init__(self, db_url: str):
-        self.db_url = db_url
-        self.connection = None
-    
-    async def __aenter__(self):
-        """异步进入上下文"""
-        print(f"连接到数据库: {self.db_url}")
-        await asyncio.sleep(0.1)  # 模拟连接耗时
-        self.connection = {"status": "connected", "url": self.db_url}
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """异步退出上下文"""
-        print("关闭数据库连接")
-        await asyncio.sleep(0.1)  # 模拟关闭耗时
-        self.connection = None
-        return False  # 不抑制异常
-    
-    async def query(self, sql: str):
-        """执行查询"""
-        if not self.connection:
-            raise RuntimeError("数据库未连接")
-        await asyncio.sleep(0.05)
-        return {"sql": sql, "result": "查询结果"}
-
-@asynccontextmanager
-async def async_file_handler(filename: str):
-    """异步文件处理器（使用装饰器）"""
-    print(f"打开文件: {filename}")
-    await asyncio.sleep(0.1)
-    
-    file_handler = {"filename": filename, "mode": "r"}
-    
+async def safe_call_api(client, url, payload, provider_name):
+    """安全地调用 API（带错误处理）"""
     try:
-        yield file_handler
-    finally:
-        print(f"关闭文件: {filename}")
-        await asyncio.sleep(0.1)
+        response = await client.post(url, json=payload, timeout=30.0)
+        response.raise_for_status()
+        return {
+            "provider": provider_name,
+            "success": True,
+            "data": response.json()
+        }
+    except httpx.TimeoutException:
+        return {
+            "provider": provider_name,
+            "success": False,
+            "error": "请求超时"
+        }
+    except httpx.HTTPStatusError as e:
+        return {
+            "provider": provider_name,
+            "success": False,
+            "error": f"HTTP 错误: {e.response.status_code}"
+        }
+    except Exception as e:
+        return {
+            "provider": provider_name,
+            "success": False,
+            "error": f"未知错误: {str(e)}"
+        }
 
-# 2. 异步生成器
-async def async_number_generator(start: int, end: int) -> AsyncGenerator[int, None]:
-    """异步数字生成器"""
-    for i in range(start, end):
-        await asyncio.sleep(0.1)  # 模拟异步操作
-        yield i
+async def compare_with_error_handling():
+    """带错误处理的并发调用"""
+    async with httpx.AsyncClient() as client:
+        # 创建任务（每个 API 都有错误处理）
+        tasks = [
+            safe_call_api(client, "https://api.openai.com/v1/chat/completions",
+                         {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hi"}]},
+                         "OpenAI"),
+            safe_call_api(client, "https://httpbin.org/delay/1",
+                         {}, "SlowAPI"),
+            safe_call_api(client, "https://httpbin.org/status/500",
+                         {}, "BrokenAPI"),
+        ]
 
-async def async_data_stream():
-    """异步数据流处理"""
-    async for number in async_number_generator(1, 10):
-        print(f"处理数字: {number}")
+        results = await asyncio.gather(*tasks)
 
-# 3. 异步迭代器
-class AsyncDataProcessor:
-    """异步数据处理器"""
-    
-    def __init__(self, data: list):
-        self.data = data
-        self.index = 0
-    
-    def __aiter__(self):
-        return self
-    
-    async def __anext__(self):
-        if self.index >= len(self.data):
-            raise StopAsyncIteration
-        
-        await asyncio.sleep(0.1)  # 模拟异步处理
-        item = self.data[self.index]
-        self.index += 1
-        return item
+        for result in results:
+            if result["success"]:
+                print(f"{result['provider']}: 成功")
+            else:
+                print(f"{result['provider']}: 失败 - {result['error']}")
 
-async def process_async_iterator():
-    """使用异步迭代器"""
-    data = [1, 2, 3, 4, 5]
-    processor = AsyncDataProcessor(data)
-    
-    async for item in processor:
-        print(f"处理项目: {item}")
-
-if __name__ == "__main__":
-    # 测试异步上下文管理器
-    async def test_context_manager():
-        async with AsyncDatabaseConnection("sqlite:///test.db") as db:
-            result = await db.query("SELECT * FROM users")
-            print(f"查询结果: {result}")
-        
-        async with async_file_handler("test.txt") as f:
-            print(f"处理文件: {f}")
-    
-    asyncio.run(test_context_manager())
-    
-    # 测试异步生成器
-    asyncio.run(async_data_stream())
-    
-    # 测试异步迭代器
-    asyncio.run(process_async_iterator())
+asyncio.run(compare_with_error_handling())
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | 协程不执行 | 确保使用 `await` 或 `asyncio.run()` 启动 |
-| 2 | 事件循环报错 | 检查是否在异步函数中使用 `await` |
-| 3 | 并发任务阻塞 | 使用 `asyncio.gather()` 而不是顺序 `await` |
-| 4 | 异步上下文管理器错误 | 实现 `__aenter__` 和 `__aexit__` 方法 |
+输出：
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| 协程 | 用 async def 定义的异步函数 |
-| 事件循环 | 管理和调度协程的执行器 |
-| await | 等待协程完成的关键字 |
-| asyncio.gather | 并发执行多个协程 |
-| Semaphore | 控制并发数量的信号量 |
-| 异步上下文管理器 | 支持 async with 的对象 |
-| 异步生成器 | 使用 yield 的异步函数 |
+```
+OpenAI: 成功
+SlowAPI: 成功
+BrokenAPI: 失败 - HTTP 错误: 500
+```
 
-## ✅ 验收清单
-- [ ] 理解同步和异步的区别
-- [ ] 能编写基本的异步程序
-- [ ] 掌握 asyncio.gather 的用法
-- [ ] 理解异步上下文管理器
+### 4.3 使用信号量控制并发数量
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+如果你同时调用 100 个 API，可能会触发限流。用 `Semaphore` 控制同时最多几个：
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+```python
+# ============================================
+# 使用 Semaphore 控制并发
+# ============================================
+
+async def controlled_concurrent_calls():
+    """控制并发数量"""
+    # 最多同时 5 个请求
+    semaphore = asyncio.Semaphore(5)
+
+    async def limited_fetch(client, url, task_id):
+        async with semaphore:  # 获取信号量（限制并发）
+            print(f"任务 {task_id} 开始")
+            response = await client.get(url)
+            print(f"任务 {task_id} 完成")
+            return response.status_code
+
+    urls = [f"https://httpbin.org/delay/1" for _ in range(20)]
+
+    async with httpx.AsyncClient() as client:
+        tasks = [limited_fetch(client, url, i) for i, url in enumerate(urls)]
+        results = await asyncio.gather(*tasks)
+
+    print(f"所有 {len(results)} 个任务完成")
+
+asyncio.run(controlled_concurrent_calls())
+```
+
+---
+
+## 5. 常见错误和解决方案
+
+### 错误 1：协程不执行
+
+```python
+# 症状：程序什么都不输出
+
+# 原因：忘记 await 或 asyncio.run()
+
+# 错误写法
+async def main():
+    fetch_data()    # 不会执行！
+
+# 正确写法
+async def main():
+    await fetch_data()
+
+asyncio.run(main())    # 启动事件循环
+```
+
+### 错误 2：在同步函数中调用 await
+
+```python
+# 症状：SyntaxError: 'await' outside async function
+
+# 错误写法
+def normal_func():
+    await asyncio.sleep(1)    # 错误！
+
+# 正确写法
+async def async_func():
+    await asyncio.sleep(1)
+```
+
+### 错误 3：在异步代码中使用 time.sleep
+
+```python
+# 症状：程序卡住，无法并发
+
+# 错误写法（time.sleep 会阻塞整个事件循环）
+async def bad_func():
+    time.sleep(3)    # 阻塞！
+
+# 正确写法
+async def good_func():
+    await asyncio.sleep(3)    # 异步等待，不阻塞
+```
+
+---
+
+## 6. 今日小结
+
+| 知识点 | 要点 |
+|--------|------|
+| 同步 vs 异步 | 同步一个一个来，异步同时进行 |
+| `async def` | 定义协程函数 |
+| `await` | 等待异步操作完成 |
+| `asyncio.run()` | 启动事件循环 |
+| `asyncio.gather()` | 并发执行多个协程 |
+| `asyncio.Semaphore` | 控制并发数量 |
+| httpx.AsyncClient | 异步 HTTP 客户端 |
+| **不要**用 time.sleep | 在异步代码中用 asyncio.sleep |
+
+---
+
+## 7. 课后练习
+
+1. 编写同步和异步版本的程序，对比执行时间
+2. 使用 httpx.AsyncClient 并发调用 `https://httpbin.org/delay/1` 10 次，验证并发效果
+3. 使用 Semaphore 限制并发数量为 3，调用 10 个 API
+4. 尝试用 asyncio.gather 同时调用 OpenAI 和 DeepSeek API（如果有的话）
+
+---
+
+> **明天预告**：Day 5 我们将学习使用 typer 构建命令行工具——这是让你的 Agent 变得更专业、更易用的关键。

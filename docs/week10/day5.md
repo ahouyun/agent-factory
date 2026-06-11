@@ -1,529 +1,587 @@
-# 📅 Week 10 Day 5：动手微调一个小模型（可选）
+# 📅 Week 10 Day 5：动手微调实验（可选）
+
+---
 
 ## 🧭 今日方向
-> 使用 LoRA 实际微调一个小语言模型，体验完整的微调流程，从数据准备到模型评估。
 
-## 🎯 生味比喻
-> 微调模型就像教一个已经会说话的小孩（预训练模型）学习一项新技能（特定任务）。你不需要重新教他语言（预训练），只需要给他一些示范例子（SFT 数据），他就能学会新技能。今天我们就来当这个"老师"，教一个小模型学会回答特定领域的问题。
+今天我们进行完整的微调实验：使用 Hugging Face TRL 库，基于 LoRA/QLoRA 在自定义数据上微调一个小语言模型。这是理论到实践的关键一步。
+
+**核心问题：** 如何从零开始完成一个完整的模型微调流程？
+
+---
+
+## 🎯 生活比喻
+
+- **微调实验** = 实际做一道菜
+- 今天之前我们都在学习理论（菜谱、食材、厨具）
+- 今天我们要真正下厨，从备料（数据准备）到烹饪（训练）到上菜（推理）
+
+---
 
 ## 📋 今日三件事
-1. 准备微调数据集（格式化为 Alpaca 格式）
-2. 使用 LoRA 微调 GPT-2 或类似的 small model
-3. 测试微调后的模型效果
+
+1. **准备训练数据**——构造一个小型 SFT 数据集
+2. **配置微调参数**——LoRA + 训练超参数
+3. **运行训练并监控**——观察 loss 曲线和模型输出变化
+
+---
 
 ## 🗺️ 手把手路线
 
-### Step 1：准备训练数据
-- 做什么: 创建指令-回答格式的训练数据
-- 为什么: 高质量的数据是微调成功的基础
-- 成功标志: 能创建 20+ 条格式正确的训练数据
+### 第一步：环境准备
 
-### Step 2：加载预训练模型
-- 做什么: 加载一个小模型（如 GPT-2）作为基础
-- 为什么: 从头训练成本太高，微调更实际
-- 成功标志: 能成功加载模型并进行推理
+```bash
+# 基础依赖
+pip install torch transformers datasets accelerate
 
-### Step 3：应用 LoRA 微调
-- 做什么: 给模型添加 LoRA 层并训练
-- 为什么: LoRA 是最常用的高效微调方法
-- 成功标志: 训练 loss 下降
+# PEFT 和 TRL
+pip install peft trl
 
-### Step 4：测试微调效果
-- 做什么: 用测试数据验证微调效果
-- 为什么: 验证微调是否成功
-- 成功标志: 模型能生成合理的回答
+# 可选：用于监控训练
+pip install wandb tensorboard
+
+# 可选：量化支持（需要 NVIDIA GPU）
+pip install bitsandbytes
+```
+
+### 第二步：检查硬件环境
+
+```bash
+# 检查 GPU 是否可用
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\"}')"
+```
+
+---
 
 ## 💻 代码区
 
+### 代码 1：准备训练数据
+
 ```python
 """
-动手微调一个小模型
-使用 GPT-2 + LoRA 实现完整的微调流程
+Day 5 - 准备 SFT 训练数据
+构造一个小型但高质量的训练数据集
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-from typing import List, Dict, Tuple
+
 import json
 import os
 
-# ========== 1. 训练数据准备 ==========
+print("=" * 60)
+print("准备 SFT 训练数据")
+print("=" * 60)
 
-def create_training_data() -> List[Dict]:
-    """
-    创建训练数据（Alpaca 格式）
-    instruction: 指令
-    input: 输入（可选）
-    output: 期望输出
-    """
-    dataset = [
-        {
-            "instruction": "请用一句话解释什么是机器学习",
-            "input": "",
-            "output": "机器学习是让计算机从数据中自动学习规律并做出预测的方法。"
-        },
-        {
-            "instruction": "请将以下英文翻译成中文",
-            "input": "The weather is nice today.",
-            "output": "今天天气很好。"
-        },
-        {
-            "instruction": "请总结以下文本",
-            "input": "深度学习在图像识别领域取得了巨大成功，特别是在医学影像诊断中表现突出。",
-            "output": "深度学习在图像识别尤其是医学影像诊断方面有重大突破。"
-        },
-        {
-            "instruction": "请列出三个学习编程的好处",
-            "input": "",
-            "output": "1. 提升逻辑思维能力 2. 增强就业竞争力 3. 可以创造自己的产品"
-        },
-        {
-            "instruction": "请解释什么是 API",
-            "input": "",
-            "output": "API 是应用程序编程接口，它定义了不同软件组件之间交互的规范和协议。"
-        },
-        {
-            "instruction": "请将以下句子改成更礼貌的表达",
-            "input": "把文件发给我",
-            "output": "请您方便的时候将文件发送给我，谢谢。"
-        },
-        {
-            "instruction": "请用 Python 写一个打印 Hello World 的程序",
-            "input": "",
-            "output": "print('Hello, World!')"
-        },
-        {
-            "instruction": "请解释什么是数据库索引",
-            "input": "",
-            "output": "数据库索引是一种数据结构，用于加速数据检索操作，类似于书的目录。"
-        },
-        {
-            "instruction": "请将以下 JSON 解析为 Python 字典",
-            "input": '{"name": "张三", "age": 25}',
-            "output": "import json; data = json.loads('{\"name\": \"张三\", \"age\": 25}')"
-        },
-        {
-            "instruction": "请解释什么是 RESTful API",
-            "input": "",
-            "output": "RESTful API 是一种遵循 REST 架构风格的 Web API，使用 HTTP 方法进行资源操作。"
-        },
-        {
-            "instruction": "请用 SQL 查询所有年龄大于 25 的用户",
-            "input": "表名: users, 字段: name, age",
-            "output": "SELECT * FROM users WHERE age > 25;"
-        },
-        {
-            "instruction": "请解释什么是 Docker",
-            "input": "",
-            "output": "Docker 是一个容器化平台，用于打包、分发和运行应用程序及其依赖项。"
-        },
-        {
-            "instruction": "请将列表去重并排序",
-            "input": "[3, 1, 4, 1, 5, 9, 2, 6, 5]",
-            "output": "sorted(set([3, 1, 4, 1, 5, 9, 2, 6, 5]))  # [1, 2, 3, 4, 5, 6, 9]"
-        },
-        {
-            "instruction": "请解释什么是 Git",
-            "input": "",
-            "output": "Git 是一个分布式版本控制系统，用于跟踪文件更改和协调多人协作开发。"
-        },
-        {
-            "instruction": "请写一个 Python 函数计算斐波那契数列",
-            "input": "n = 10",
-            "output": "def fibonacci(n): a, b = 0, 1; return [a := b := a + b for _ in range(n)]"
-        },
-        {
-            "instruction": "请解释什么是微服务架构",
-            "input": "",
-            "output": "微服务架构是将应用拆分为多个小型、独立部署的服务，每个服务负责特定业务功能。"
-        },
-        {
-            "instruction": "请用正则表达式匹配邮箱地址",
-            "input": "",
-            "output": "import re; pattern = r'[\\w.-]+@[\\w.-]+\\.\\w+'"
-        },
-        {
-            "instruction": "请解释什么是 Kubernetes",
-            "input": "",
-            "output": "Kubernetes 是一个容器编排平台，用于自动化容器化应用的部署、扩展和管理。"
-        },
-        {
-            "instruction": "请将 Markdown 转换为 HTML",
-            "input": "# 标题",
-            "output": "<h1>标题</h1>"
-        },
-        {
-            "instruction": "请解释什么是 CI/CD",
-            "input": "",
-            "output": "CI/CD 是持续集成/持续部署的缩写，是软件开发中的自动化实践流程。"
-        },
-    ]
-    return dataset
+# ============================================================
+# 1. 构造训练数据
+# ============================================================
+training_data = [
+    {
+        "messages": [
+            {"role": "system", "content": "你是一个Python编程助手，擅长解答编程问题。"},
+            {"role": "user", "content": "如何用Python读取JSON文件？"},
+            {"role": "assistant", "content": "使用 json 模块可以轻松读取 JSON 文件：\n\n```python\nimport json\n\n# 读取 JSON 文件\nwith open('data.json', 'r', encoding='utf-8') as f:\n    data = json.load(f)\n\nprint(data)\n```\n\n如果 JSON 文件很大，可以使用流式读取：\n```python\nimport ijson  # 需要安装: pip install ijson\n\nwith open('large.json', 'rb') as f:\n    for item in ijson.items(f, 'item'):\n        process(item)\n```"}
+        ]
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "你是一个Python编程助手，擅长解答编程问题。"},
+            {"role": "user", "content": "解释Python的异常处理机制"},
+            {"role": "assistant", "content": "Python 的异常处理使用 try-except-finally 语句：\n\n```python\ntry:\n    # 可能出错的代码\n    result = 10 / 0\nexcept ZeroDivisionError as e:\n    # 处理特定异常\n    print(f\"除零错误: {e}\")\nexcept Exception as e:\n    # 处理其他异常\n    print(f\"未知错误: {e}\")\nelse:\n    # 没有异常时执行\n    print(\"操作成功\")\nfinally:\n    # 无论如何都执行\n    print(\"清理资源\")\n```\n\n最佳实践：\n1. 捕获具体异常，不要用裸 except\n2. 使用 else 处理成功情况\n3. 使用 finally 清理资源"}
+        ]
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "你是一个Python编程助手，擅长解答编程问题。"},
+            {"role": "user", "content": "Python中如何实现单例模式？"},
+            {"role": "assistant", "content": "Python 中有多种实现单例模式的方法：\n\n方法1：使用 __new__ 方法\n```python\nclass Singleton:\n    _instance = None\n    \n    def __new__(cls):\n        if cls._instance is None:\n            cls._instance = super().__new__(cls)\n        return cls._instance\n```\n\n方法2：使用装饰器\n```python\ndef singleton(cls):\n    instances = {}\n    def get_instance(*args, **kwargs):\n        if cls not in instances:\n            instances[cls] = cls(*args, **kwargs)\n        return instances[cls]\n    return get_instance\n\n@singleton\nclass MyClass:\n    pass\n```\n\n方法3：使用模块（推荐）\n```python\n# singleton.py\nclass _Singleton:\n    pass\n\ninstance = _Singleton()\n```\n\n在 Python 中，通常直接使用模块级变量即可实现单例效果。"}
+        ]
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "你是一个Python编程助手，擅长解答编程问题。"},
+            {"role": "user", "content": "解释Python的GIL（全局解释器锁）"},
+            {"role": "assistant", "content": "GIL（Global Interpreter Lock）是 CPython 解释器中的一个机制，它确保同一时刻只有一个线程执行 Python 字节码。\n\n影响：\n1. 多线程无法利用多核 CPU 进行并行计算\n2. CPU 密集型任务建议使用 multiprocessing\n3. IO 密集型任务使用多线程仍然有效\n\n解决方案：\n```python\n# CPU 密集型：使用多进程\nfrom multiprocessing import Pool\n\nwith Pool(4) as p:\n    results = p.map(cpu_intensive_func, data)\n\n# IO 密集型：使用多线程\nfrom concurrent.futures import ThreadPoolExecutor\n\nwith ThreadPoolExecutor(max_workers=4) as executor:\n    results = list(executor.map(io_intensive_func, urls))\n```\n\n注意：PyPy 和其他 Python 实现可能没有 GIL，或者可以禁用 GIL（Python 3.12+ 支持）。"}
+        ]
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "你是一个Python编程助手，擅长解答编程问题。"},
+            {"role": "user", "content": "Python中如何进行性能优化？"},
+            {"role": "assistant", "content": "Python 性能优化可以从多个层面进行：\n\n1. 算法优化：选择合适的算法和数据结构\n```python\n# 使用 set 进行 O(1) 查找\nif item in large_set:  # O(1)\n    pass\n\n# 避免在循环中重复计算\nresult = expensive_func()\nfor item in data:\n    process(item, result)  # 只计算一次\n```\n\n2. 使用内置函数和库\n```python\n# 使用 map/filter 代替循环\nsquared = list(map(lambda x: x**2, data))\n\n# 使用 NumPy 进行数值计算\nimport numpy as np\nresult = np.dot(a, b)  # 比纯 Python 快 10-100 倍\n```\n\n3. 使用生成器减少内存\n```python\n# 生成器表达式\nsum(x**2 for x in range(1000000))\n\n# 而不是列表推导式\nsum([x**2 for x in range(1000000)])  # 占用更多内存\n```\n\n4. 缓存重复计算\n```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=128)\ndef fibonacci(n):\n    if n < 2:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)\n```"}
+        ]
+    },
+]
 
+print(f"训练数据: {len(training_data)} 条")
 
-# ========== 2. 数据集类 ==========
+# 保存数据
+os.makedirs("./train_data", exist_ok=True)
+with open("./train_data/sft_data.jsonl", "w", encoding="utf-8") as f:
+    for item in training_data:
+        f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-class SFTDataset(Dataset):
-    """SFT 训练数据集"""
-    def __init__(self, data: List[Dict], tokenizer_func=None, max_length=128):
-        self.data = data
-        self.max_length = max_length
-        
-        if tokenizer_func is None:
-            self.tokenizer = self._simple_tokenizer
-        else:
-            self.tokenizer = tokenizer_func
-    
-    def _simple_tokenizer(self, text: str) -> List[int]:
-        """简单分词器：将文本转换为 token ids"""
-        # 使用字符级编码（仅用于演示）
-        tokens = []
-        for char in text[:self.max_length]:
-            # 将字符映射到 0-999 的范围
-            token = ord(char) % 1000
-            tokens.append(token)
-        return tokens
-    
-    def __len__(self):
-        return len(self.data)
-    
-    def __getitem__(self, idx):
-        sample = self.data[idx]
-        
-        # 构造输入格式
-        if sample["input"]:
-            prompt = f"### 指令:\n{sample['instruction']}\n### 输入:\n{sample['input']}\n### 回答:\n"
-        else:
-            prompt = f"### 指令:\n{sample['instruction']}\n### 回答:\n"
-        
-        full_text = prompt + sample["output"]
-        
-        # 编码
-        prompt_tokens = self.tokenizer(prompt)
-        full_tokens = self.tokenizer(full_text)
-        
-        # 截断
-        prompt_tokens = prompt_tokens[:self.max_length]
-        full_tokens = full_tokens[:self.max_length]
-        
-        # 构造 labels（只在回答部分计算 loss）
-        labels = [-100] * len(prompt_tokens) + full_tokens[len(prompt_tokens):]
-        labels = labels[:self.max_length]
-        
-        # 填充到固定长度
-        padding_length = self.max_length - len(full_tokens)
-        input_ids = full_tokens + [0] * padding_length
-        labels = labels + [-100] * padding_length
-        
-        return {
-            "input_ids": torch.tensor(input_ids, dtype=torch.long),
-            "labels": torch.tensor(labels, dtype=torch.long)
-        }
+print(f"数据已保存到: ./train_data/sft_data.jsonl")
+print()
 
+# 显示数据统计
+total_chars = 0
+for item in training_data:
+    for msg in item["messages"]:
+        if msg["role"] == "assistant":
+            total_chars += len(msg["content"])
 
-# ========== 3. LoRA 层实现 ==========
-
-class LoRALayer(nn.Module):
-    """LoRA 层"""
-    def __init__(self, in_features: int, out_features: int, rank: int = 4, alpha: float = 1.0):
-        super().__init__()
-        self.rank = rank
-        self.alpha = alpha
-        self.scaling = alpha / rank
-        
-        # 低秩矩阵
-        self.lora_A = nn.Parameter(torch.randn(rank, in_features) * 0.01)
-        self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
-    
-    def forward(self, x):
-        # x: [batch, seq_len, in_features]
-        # LoRA 计算
-        lora_output = torch.matmul(x, self.lora_A.T)  # [batch, seq_len, rank]
-        lora_output = torch.matmul(lora_output, self.lora_B.T)  # [batch, seq_len, out_features]
-        return lora_output * self.scaling
-
-
-# ========== 4. 简化的 GPT-2 模型 ==========
-
-class SimpleGPT2(nn.Module):
-    """简化的 GPT-2 模型"""
-    def __init__(self, vocab_size=1000, d_model=256, n_heads=4, n_layers=4, max_seq_len=128):
-        super().__init__()
-        self.d_model = d_model
-        
-        # Embedding
-        self.token_embedding = nn.Embedding(vocab_size, d_model)
-        self.position_embedding = nn.Embedding(max_seq_len, d_model)
-        
-        # Transformer Blocks
-        self.blocks = nn.ModuleList([
-            nn.TransformerEncoderLayer(
-                d_model=d_model,
-                nhead=n_heads,
-                dim_feedforward=d_model * 4,
-                batch_first=True,
-                dropout=0.1
-            )
-            for _ in range(n_layers)
-        ])
-        
-        # Output
-        self.layer_norm = nn.LayerNorm(d_model)
-        self.output_head = nn.Linear(d_model, vocab_size, bias=False)
-        
-        # LoRA 层（可选）
-        self.lora_layers = {}
-    
-    def add_lora(self, layer_name: str, in_features: int, out_features: int, rank: int = 4):
-        """添加 LoRA 层"""
-        self.lora_layers[layer_name] = LoRALayer(in_features, out_features, rank)
-    
-    def forward(self, input_ids, labels=None):
-        batch_size, seq_len = input_ids.shape
-        
-        # Embedding
-        positions = torch.arange(seq_len, device=input_ids.device).unsqueeze(0)
-        x = self.token_embedding(input_ids) + self.position_embedding(positions)
-        
-        # Transformer Blocks
-        mask = torch.triu(torch.ones(seq_len, seq_len, device=input_ids.device), diagonal=1).bool()
-        for block in self.blocks:
-            x = block(x, mask=mask)
-        
-        # Output
-        x = self.layer_norm(x)
-        logits = self.output_head(x)
-        
-        # 计算 loss
-        loss = None
-        if labels is not None:
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            loss = F.cross_entropy(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1),
-                ignore_index=-100
-            )
-        
-        return {"logits": logits, "loss": loss}
-
-
-# ========== 5. 训练器 ==========
-
-class Trainer:
-    """训练器"""
-    def __init__(self, model, tokenizer_func=None, lr=5e-4):
-        self.model = model
-        self.optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-        self.tokenizer_func = tokenizer_func
-    
-    def train_epoch(self, dataloader: DataLoader):
-        """训练一个 epoch"""
-        self.model.train()
-        total_loss = 0
-        num_batches = 0
-        
-        for batch in dataloader:
-            input_ids = batch["input_ids"]
-            labels = batch["labels"]
-            
-            # 前向传播
-            outputs = self.model(input_ids, labels=labels)
-            loss = outputs["loss"]
-            
-            # 反向传播
-            self.optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-            self.optimizer.step()
-            
-            total_loss += loss.item()
-            num_batches += 1
-        
-        return total_loss / num_batches
-    
-    def generate(self, prompt: str, max_new_tokens: int = 50, temperature: float = 0.8) -> str:
-        """生成文本"""
-        self.model.eval()
-        
-        # 编码 prompt
-        if self.tokenizer_func:
-            tokens = self.tokenizer_func(prompt)
-        else:
-            tokens = [ord(c) % 1000 for c in prompt]
-        
-        input_ids = torch.tensor([tokens], dtype=torch.long)
-        
-        with torch.no_grad():
-            for _ in range(max_new_tokens):
-                # 截断到模型支持的最大长度
-                input_ids_truncated = input_ids[:, -128:]
-                
-                # 前向传播
-                outputs = self.model(input_ids_truncated)
-                logits = outputs["logits"][:, -1, :] / temperature
-                
-                # 采样
-                probs = F.softmax(logits, dim=-1)
-                next_token = torch.multinomial(probs, num_samples=1)
-                
-                # 拼接
-                input_ids = torch.cat([input_ids, next_token], dim=-1)
-        
-        # 解码
-        generated_tokens = input_ids[0].tolist()
-        if self.tokenizer_func:
-            # 简单解码（实际应用中需要完整的 tokenizer）
-            decoded = "".join([chr(t % 256) for t in generated_tokens])
-        else:
-            decoded = "".join([chr(t % 256) for t in generated_tokens])
-        
-        return decoded
-
-
-# ========== 6. 评估函数 ==========
-
-def evaluate_model(model, test_data: List[Dict], tokenizer_func=None):
-    """评估模型效果"""
-    print("\n模型评估:")
-    print("=" * 50)
-    
-    trainer = Trainer(model, tokenizer_func)
-    
-    correct = 0
-    total = len(test_data)
-    
-    for sample in test_data:
-        prompt = f"### 指令:\n{sample['instruction']}\n### 输入:\n{sample.get('input', '')}\n### 回答:\n"
-        generated = trainer.generate(prompt, max_new_tokens=100)
-        
-        # 简单评估：检查输出是否包含期望内容的关键字
-        expected_keywords = sample["output"][:20]
-        if expected_keywords in generated:
-            correct += 1
-        
-        print(f"\n指令: {sample['instruction'][:30]}...")
-        print(f"期望: {sample['output'][:50]}...")
-        print(f"生成: {generated[:50]}...")
-    
-    accuracy = correct / total * 100
-    print(f"\n准确率: {accuracy:.1f}% ({correct}/{total})")
-    return accuracy
-
-
-# ========== 7. 主函数 ==========
-
-def main():
-    """主函数：完整的微调流程"""
-    print("=" * 60)
-    print("动手微调一个小模型")
-    print("=" * 60)
-    
-    # 1. 创建训练数据
-    print("\n1. 创建训练数据...")
-    train_data = create_training_data()
-    print(f"   训练数据量: {len(train_data)}")
-    
-    # 分割训练集和测试集
-    train_size = int(len(train_data) * 0.8)
-    train_set = train_data[:train_size]
-    test_set = train_data[train_size:]
-    print(f"   训练集: {train_size}, 测试集: {len(test_set)}")
-    
-    # 2. 创建数据集和数据加载器
-    print("\n2. 创建数据集...")
-    dataset = SFTDataset(train_set, max_length=128)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
-    print(f"   数据集大小: {len(dataset)}")
-    
-    # 3. 创建模型
-    print("\n3. 创建模型...")
-    model = SimpleGPT2(vocab_size=1000, d_model=256, n_heads=4, n_layers=4)
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"   模型参数量: {total_params:,}")
-    
-    # 4. 添加 LoRA（可选）
-    print("\n4. 添加 LoRA 层...")
-    # 这里简化处理，实际应用中需要更精确地添加
-    print("   LoRA 已集成到模型中")
-    
-    # 5. 训练
-    print("\n5. 开始训练...")
-    trainer = Trainer(model, lr=5e-4)
-    
-    epochs = 5
-    for epoch in range(epochs):
-        loss = trainer.train_epoch(dataloader)
-        print(f"   Epoch {epoch+1}/{epochs}, Loss: {loss:.4f}")
-    
-    # 6. 评估
-    print("\n6. 评估模型...")
-    # 注意：这里的评估是简化的，实际应用中需要更完善的评估
-    print("   训练完成！")
-    
-    # 7. 测试生成
-    print("\n7. 测试生成...")
-    test_prompts = [
-        "### 指令:\n请用一句话解释什么是机器学习\n### 回答:\n",
-        "### 指令:\n请解释什么是 API\n### 回答:\n",
-    ]
-    
-    for prompt in test_prompts:
-        generated = trainer.generate(prompt, max_new_tokens=50)
-        print(f"\nPrompt: {prompt[:30]}...")
-        print(f"生成: {generated[:100]}...")
-    
-    print("\n" + "=" * 60)
-    print("微调完成！")
-    print("=" * 60)
-    
-    # 保存模型（可选）
-    print("\n模型保存（演示用，实际保存需要 torch.save）")
-    print("   保存路径: ./fine_tuned_model/")
-    
-    return model
-
-
-if __name__ == "__main__":
-    model = main()
+print(f"数据统计:")
+print(f"  总样本数: {len(training_data)}")
+print(f"  平均回答长度: {total_chars / len(training_data):.0f} 字符")
+print(f"  主题覆盖: JSON读取、异常处理、单例模式、GIL、性能优化")
 ```
 
-## 🆘 急救包
-| # | 症状 | 解法 |
-|---|------|------|
-| 1 | GPU 内存不足 | 减小 batch_size，使用梯度累积 |
-| 2 | 训练 loss 不下降 | 降低学习率，检查数据格式 |
-| 3 | 生成结果重复 | 增大 temperature，使用 top-p 采样 |
-| 4 | 训练速度太慢 | 使用更小的模型，减少序列长度 |
-| 5 | 保存模型失败 | 检查磁盘空间，使用 torch.save |
+### 代码 2：配置和运行微调
 
-## 📖 概念对照表
-| 术语 | 一句话解释 |
-|------|-----------|
-| Fine-tuning | 在预训练模型基础上用特定数据继续训练 |
-| Alpaca 格式 | 包含 instruction/input/output 的训练数据格式 |
-| Epoch | 完整遍历一次训练数据集 |
-| Batch Size | 每次训练使用的样本数量 |
-| Learning Rate | 控制参数更新步长的超参数 |
-| Gradient Clipping | 防止梯度爆炸的技术 |
-| Temperature | 控制生成随机性的参数 |
-| Top-p Sampling | 核采样，选择累积概率最高的 token |
+```python
+"""
+Day 5 - 配置和运行微调
+使用 Hugging Face TRL + PEFT 进行 SFT 微调
+"""
 
-## ✅ 验收清单
-- [ ] 能创建格式正确的训练数据
-- [ ] 能成功加载和运行模型
-- [ ] 训练 loss 能够下降
-- [ ] 模型能生成基本合理的输出
-- [ ] 理解 LoRA 微调的完整流程
+import torch
+import json
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    TrainingArguments,
+)
+from peft import LoraConfig, get_peft_model, TaskType
+from trl import SFTTrainer, SFTConfig
+from datasets import Dataset
 
-## 📝 复盘小纸条
-- 今天最大的收获: ...
-- 还不太确定的: ...
+print("=" * 60)
+print("配置和运行微调")
+print("=" * 60)
 
-## 📥 明日同步接口
-- 今日完成度: ...
-- 卡点描述: ...
-- 代码是否能跑通: ...
-- 明天希望: ...
+# ============================================================
+# 步骤 1: 加载训练数据
+# ============================================================
+print("\n步骤 1: 加载训练数据")
+print("-" * 40)
+
+data_path = "./train_data/sft_data.jsonl"
+training_examples = []
+with open(data_path, "r", encoding="utf-8") as f:
+    for line in f:
+        training_examples.append(json.loads(line.strip()))
+
+dataset = Dataset.from_list(training_examples)
+print(f"  加载数据: {len(dataset)} 条")
+
+# ============================================================
+# 步骤 2: 加载模型
+# ============================================================
+print("\n步骤 2: 加载模型")
+print("-" * 40)
+
+# 根据硬件选择模型
+model_name = "Qwen/Qwen2-0.5B"  # 小模型，适合演示
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"  设备: {device}")
+print(f"  模型: {model_name}")
+
+try:
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+        device_map="auto" if device == "cuda" else None,
+        trust_remote_code=True,
+    )
+    print(f"  模型参数量: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
+    model_loaded = True
+except Exception as e:
+    print(f"  模型加载失败: {e}")
+    print("  提示：请确保网络连接正常，或使用本地模型路径")
+    model_loaded = False
+
+# ============================================================
+# 步骤 3: 配置 LoRA
+# ============================================================
+print("\n步骤 3: 配置 LoRA")
+print("-" * 40)
+
+lora_config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    r=8,                          # LoRA 秩
+    lora_alpha=32,                # 缩放因子
+    lora_dropout=0.1,             # Dropout
+    target_modules=["q_proj", "v_proj"],  # 目标模块
+)
+
+print(f"  秩 (r): {lora_config.r}")
+print(f"  缩放因子 (alpha): {lora_config.lora_alpha}")
+print(f"  目标模块: {lora_config.target_modules}")
+
+if model_loaded:
+    peft_model = get_peft_model(model, lora_config)
+    peft_model.print_trainable_parameters()
+else:
+    peft_model = None
+    print("  跳过 LoRA 配置（模型未加载）")
+
+# ============================================================
+# 步骤 4: 配置训练参数
+# ============================================================
+print("\n步骤 4: 配置训练参数")
+print("-" * 40)
+
+training_args = SFTConfig(
+    output_dir="./sft_output",
+    num_train_epochs=3,              # 训练轮数
+    per_device_train_batch_size=1,   # 批大小（小模型可用更大值）
+    gradient_accumulation_steps=2,   # 梯度累积
+    learning_rate=2e-4,              # 学习率
+    weight_decay=0.01,               # 权重衰减
+    warmup_ratio=0.1,                # 预热比例
+    logging_steps=1,                 # 日志间隔
+    save_strategy="epoch",           # 保存策略
+    fp16=(device == "cuda"),         # 混合精度
+    report_to="none",                # 不上报到 wandb
+    max_seq_length=512,              # 最大序列长度
+    dataloader_num_workers=0,        # 数据加载线程数
+)
+
+print(f"  输出目录: {training_args.output_dir}")
+print(f"  训练轮数: {training_args.num_train_epochs}")
+print(f"  学习率: {training_args.learning_rate}")
+print(f"  批大小: {training_args.per_device_train_batch_size}")
+print(f"  梯度累积: {training_args.gradient_accumulation_steps}")
+print(f"  有效批大小: {training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps}")
+
+# ============================================================
+# 步骤 5: 开始训练
+# ============================================================
+print("\n步骤 5: 开始训练")
+print("-" * 40)
+
+if peft_model is not None:
+    trainer = SFTTrainer(
+        model=peft_model,
+        args=training_args,
+        train_dataset=dataset,
+        processing_class=tokenizer,
+    )
+
+    print("  开始训练...")
+    train_result = trainer.train()
+
+    print(f"\n  训练完成！")
+    print(f"  训练损失: {train_result.training_loss:.4f}")
+    print(f"  训练步数: {train_result.global_step}")
+
+    # 保存模型
+    trainer.save_model("./sft_model_final")
+    tokenizer.save_pretrained("./sft_model_final")
+    print(f"  模型已保存到: ./sft_model_final")
+else:
+    print("  跳过训练（模型未加载）")
+    print("  实际运行时，请确保有 GPU 并能下载模型")
+
+# ============================================================
+# 步骤 6: 用微调后的模型推理
+# ============================================================
+print("\n步骤 6: 模型推理测试")
+print("-" * 40)
+
+if peft_model is not None:
+    peft_model.eval()
+
+    test_prompts = [
+        "如何用Python读取JSON文件？",
+        "解释Python的异常处理机制",
+        "Python中如何实现单例模式？",
+    ]
+
+    for prompt in test_prompts:
+        messages = [
+            {"role": "system", "content": "你是一个Python编程助手，擅长解答编程问题。"},
+            {"role": "user", "content": prompt},
+        ]
+
+        # 使用 tokenizer 的 chat 模板
+        text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+
+        inputs = tokenizer(text, return_tensors="pt").to(peft_model.device)
+
+        with torch.no_grad():
+            outputs = peft_model.generate(
+                **inputs,
+                max_new_tokens=150,
+                temperature=0.7,
+                do_sample=True,
+                top_p=0.9,
+                repetition_penalty=1.1,
+            )
+
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # 提取助手的回答部分
+        response = response.split("assistant\n")[-1].strip()
+
+        print(f"\n  问题: {prompt}")
+        print(f"  回答: {response[:200]}...")
+else:
+    print("  跳过推理测试（模型未加载）")
+```
+
+### 代码 3：训练监控和可视化
+
+```python
+"""
+Day 5 - 训练监控和可视化
+分析训练日志和 loss 曲线
+"""
+
+import json
+import os
+
+print("=" * 60)
+print("训练监控和可视化")
+print("=" * 60)
+
+# ============================================================
+# 1. 模拟训练日志
+# ============================================================
+print("\n1. 训练日志分析")
+print("-" * 40)
+
+# 模拟训练日志
+training_log = [
+    {"epoch": 1.0, "step": 1, "loss": 2.3456, "learning_rate": 2e-4},
+    {"epoch": 1.0, "step": 2, "loss": 2.1234, "learning_rate": 2e-4},
+    {"epoch": 1.0, "step": 3, "loss": 1.9876, "learning_rate": 2e-4},
+    {"epoch": 2.0, "step": 4, "loss": 1.6543, "learning_rate": 1.8e-4},
+    {"epoch": 2.0, "step": 5, "loss": 1.4321, "learning_rate": 1.6e-4},
+    {"epoch": 2.0, "step": 6, "loss": 1.2345, "learning_rate": 1.4e-4},
+    {"epoch": 3.0, "step": 7, "loss": 0.9876, "learning_rate": 1.2e-4},
+    {"epoch": 3.0, "step": 8, "loss": 0.8765, "learning_rate": 1.0e-4},
+    {"epoch": 3.0, "step": 9, "loss": 0.7654, "learning_rate": 8e-5},
+]
+
+print("  训练日志:")
+print(f"  {'Step':>5} {'Epoch':>7} {'Loss':>8} {'LR':>10}")
+print("  " + "-" * 35)
+
+for log in training_log:
+    print(f"  {log['step']:>5} {log['epoch']:>7.1f} {log['loss']:>8.4f} {log['learning_rate']:>10.2e}")
+
+# ============================================================
+# 2. Loss 曲线分析
+# ============================================================
+print("\n2. Loss 曲线分析")
+print("-" * 40)
+
+losses = [log["loss"] for log in training_log]
+steps = [log["step"] for log in training_log]
+
+# 计算 loss 下降趋势
+loss_diff = [losses[i] - losses[i-1] for i in range(1, len(losses))]
+avg_loss_diff = sum(loss_diff) / len(loss_diff)
+
+print(f"  初始 loss: {losses[0]:.4f}")
+print(f"  最终 loss: {losses[-1]:.4f}")
+print(f"  总下降: {losses[0] - losses[-1]:.4f}")
+print(f"  平均每步下降: {avg_loss_diff:.4f}")
+
+# 判断训练是否正常
+if avg_loss_diff < 0:
+    print("  状态: ✓ 训练正常，loss 持续下降")
+elif avg_loss_diff > 0.1:
+    print("  状态: ✗ 训练异常，loss 在上升")
+else:
+    print("  状态: ⚠ 训练可能收敛，loss 下降变慢")
+
+# ============================================================
+# 3. 文本 ASCII 可视化
+# ============================================================
+print("\n3. Loss 曲线 ASCII 可视化")
+print("-" * 40)
+
+# 归一化 loss 到 0-20 的范围
+max_loss = max(losses)
+min_loss = min(losses)
+normalized = [(l - min_loss) / (max_loss - min_loss + 1e-8) for l in losses]
+
+chart_height = 15
+for row in range(chart_height, -1, -1):
+    threshold = row / chart_height
+    line = f"  {row * (max_loss - min_loss) / chart_height + min_loss:>6.2f} |"
+    for i, val in enumerate(normalized):
+        if val >= threshold:
+            line += " ██ "
+        else:
+            line += "    "
+    print(line)
+
+print("       +" + "----" * len(losses))
+step_labels = "        "
+for s in steps:
+    step_labels += f" {s:>3}"
+print(step_labels)
+
+# ============================================================
+# 4. 训练建议
+# ============================================================
+print("\n4. 训练优化建议")
+print("-" * 40)
+
+suggestions = """
+  常见训练问题及解决方案：
+  ─────────────────────────────────────────────────
+  问题: Loss 不下降
+  → 降低学习率（从 2e-4 → 1e-4 → 5e-5）
+  → 检查数据格式是否正确
+  → 确认 labels 设置正确
+
+  问题: Loss 震荡剧烈
+  → 增大 batch_size
+  → 使用 gradient_accumulation_steps
+  → 检查数据是否有噪声
+
+  问题: Loss 下降到一定程度后不变
+  → 增大模型容量（更多 LoRA 层或更大 rank）
+  → 增加训练数据多样性
+  → 调整学习率调度器
+
+  问题: 过拟合（训练 loss 低但效果差）
+  → 增加 dropout
+  → 减少训练轮数
+  → 增加训练数据
+"""
+print(suggestions)
+
+# ============================================================
+# 5. 保存训练配置
+# ============================================================
+print("5. 保存训练配置")
+print("-" * 40)
+
+config = {
+    "model_name": "Qwen/Qwen2-0.5B",
+    "lora_config": {
+        "r": 8,
+        "lora_alpha": 32,
+        "lora_dropout": 0.1,
+        "target_modules": ["q_proj", "v_proj"],
+    },
+    "training_config": {
+        "num_train_epochs": 3,
+        "per_device_train_batch_size": 1,
+        "gradient_accumulation_steps": 2,
+        "learning_rate": 2e-4,
+        "weight_decay": 0.01,
+    },
+    "results": {
+        "initial_loss": losses[0],
+        "final_loss": losses[-1],
+        "total_steps": len(training_log),
+    }
+}
+
+os.makedirs("./training_config", exist_ok=True)
+config_path = "./training_config/config.json"
+with open(config_path, "w", encoding="utf-8") as f:
+    json.dump(config, f, indent=2, ensure_ascii=False)
+
+print(f"  配置已保存到: {config_path}")
+print(f"  训练配置摘要:")
+print(f"    模型: {config['model_name']}")
+print(f"    LoRA rank: {config['lora_config']['r']}")
+print(f"    训练轮数: {config['training_config']['num_train_epochs']}")
+print(f"    最终 loss: {config['results']['final_loss']:.4f}")
+```
+
+---
+
+## 📤 预期输出
+
+```
+============================================================
+准备 SFT 训练数据
+============================================================
+训练数据: 5 条
+数据已保存到: ./train_data/sft_data.jsonl
+数据统计:
+  总样本数: 5
+  平均回答长度: 385 字符
+  主题覆盖: JSON读取、异常处理、单例模式、GIL、性能优化
+
+============================================================
+配置和运行微调
+============================================================
+
+步骤 1: 加载训练数据
+  加载数据: 5 条
+
+步骤 2: 加载模型
+  设备: cuda
+  模型: Qwen/Qwen2-0.5B
+  模型参数量: 494.0M
+
+步骤 3: 配置 LoRA
+  trainable params: 294,912 || all params: 494,266,880 || trainable%: 0.0597
+
+步骤 5: 开始训练
+  训练完成！
+  训练损失: 0.7654
+  训练步数: 9
+
+步骤 6: 模型推理测试
+  问题: 如何用Python读取JSON文件？
+  回答: 使用 json 模块可以轻松读取 JSON 文件：...
+```
+
+---
+
+## ⚠️ 常见错误和解决方案
+
+### 错误 1：模型下载超时
+```
+ConnectionError: HTTPSConnectionPool... Read timed out
+```
+**解决方案：**
+- 设置 HuggingFace 镜像：`export HF_ENDPOINT=https://hf-mirror.com`
+- 使用国内镜像源：`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple`
+
+### 错误 2：训练时 loss 为 NaN
+**解决方案：**
+- 降低学习率
+- 检查数据中是否有异常值
+- 确认 `torch_dtype` 设置正确
+
+### 错误 3：显存不足
+```
+CUDA out of memory
+```
+**解决方案：**
+- 减小 batch_size 到 1
+- 增大 gradient_accumulation_steps
+- 启用 QLoRA（需要 GPU + bitsandbytes）
+- 减小 max_seq_length
+
+### 错误 4：训练后模型输出质量差
+**解决方案：**
+- 增加训练数据量
+- 提高数据质量
+- 调整 LoRA rank（从 8 → 16 → 32）
+- 增加训练轮数
+
+---
+
+## 🏋️ 每日挑战
+
+1. **完整实验**：在你自己的数据上运行一次完整的微调实验，记录训练过程中的 loss 变化。
+
+2. **对比实验**：分别用 rank=4, 8, 16 训练，比较最终效果和训练时间。
+
+3. **进阶挑战**：尝试使用 QLoRA（4-bit 量化）微调一个 3B 模型，对比全精度训练的效果差异。

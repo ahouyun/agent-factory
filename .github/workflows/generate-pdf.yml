@@ -15,15 +15,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
+      - name: Install pandoc and wkhtmltopdf
         run: |
-          npm install md-to-pdf
-          npx puppeteer browsers install chrome
+          sudo apt-get update
+          sudo apt-get install -y pandoc wkhtmltopdf texlive-xetex texlive-lang-chinese fonts-noto-cjk
 
       - name: Create pdf directory
         run: mkdir -p pdf
@@ -35,7 +30,20 @@ jobs:
               file="docs/week${week}/day${day}.md"
               if [ -f "$file" ]; then
                 echo "📄 Generating ${file}..."
-                npx md-to-pdf "$file" --output "pdf/week${week}-day${day}.pdf" || echo "⚠️ Failed: ${file}"
+                pandoc "$file" \
+                  -o "pdf/week${week}-day${day}.pdf" \
+                  --pdf-engine=xelatex \
+                  -V mainfont="Noto Sans CJK SC" \
+                  -V geometry:margin=2cm \
+                  -V fontsize=11pt \
+                  --highlight-style=tango \
+                  2>&1 || echo "⚠️ pandoc failed, trying wkhtmltopdf..."
+
+                if [ ! -f "pdf/week${week}-day${day}.pdf" ]; then
+                  pandoc "$file" -o "tmp.html" --standalone --metadata title="Week ${week} Day ${day}"
+                  wkhtmltopdf --encoding utf-8 --enable-local-file-access "tmp.html" "pdf/week${week}-day${day}.pdf" 2>/dev/null || echo "⚠️ Also failed: ${file}"
+                  rm -f "tmp.html"
+                fi
               fi
             done
           done

@@ -12,12 +12,20 @@
 2. 已创建虚拟环境并激活
 3. 打开 VS Code，进入项目目录
 
+在终端输入以下命令来准备环境：
+
 ```powershell
 # 激活虚拟环境（如果还没激活）
 cd D:\claude-workspace\agent-factory
 venv\Scripts\activate
+```
 
-# 创建今天的练习文件
+你应该看到终端提示符前面出现 `(venv)` 前缀。
+
+然后创建今天的练习文件：
+
+```powershell
+# 创建练习文件
 New-Item -Path "day5_practice.py" -ItemType File -Force
 
 # 用 VS Code 打开
@@ -28,9 +36,11 @@ code day5_practice.py
 
 ## 二、变量和数据类型
 
-Python 是**动态类型语言**，变量不需要声明类型，直接赋值即可。
+Python 是**动态类型语言**，变量不需要声明类型，直接赋值即可。就像给盒子贴标签——你不需要提前告诉 Python "这个盒子要装数字"，直接放进去就行。
 
 ### 2.1 数字类型
+
+把以下代码复制到 `day5_practice.py` 中，保存后在终端运行 `python day5_practice.py`：
 
 ```python
 # 整数（int）
@@ -58,6 +68,28 @@ print(f"除法: {a / b}")    # 3.3333...（总是返回浮点数）
 print(f"整除: {a // b}")   # 3
 print(f"取余: {a % b}")    # 1
 print(f"幂运算: {a ** b}")  # 1000
+```
+
+### 🙋 动动手
+
+现在请你动手试试：
+
+**练习 1**: 修改上面的代码，把自己的真实年龄赋值给 `age` 变量，然后打印出来。
+
+**练习 2**: 尝试以下运算，猜猜输出是什么，然后运行验证：
+```python
+print(7 / 2)     # 除法
+print(7 // 2)    # 整除
+print(7 % 2)     # 取余
+print(2 ** 10)   # 幂运算
+```
+
+**练习 3**: 创建一个变量 `price = 99.9`，再创建一个 `quantity = 3`，计算总价并打印：
+```python
+price = 99.9
+quantity = 3
+total = price * quantity
+print(f"单价: {price}, 数量: {quantity}, 总价: {total}")
 ```
 
 ### 2.2 字符串（str）
@@ -96,6 +128,34 @@ print(text[-3:])   # hon（最后 3 个字符）
 print(text[::-1])  # nohtyP（反转）
 ```
 
+### 🙋 动动手
+
+现在请你动手试试：
+
+**练习 1**: 用 f-string 打印你自己的信息：
+```python
+name = "你的名字"
+city = "你所在的城市"
+hobby = "你的爱好"
+print(f"我叫{name}，住在{city}，喜欢{hobby}")
+```
+
+**练习 2**: 尝试以下字符串操作，看看输出是什么：
+```python
+text = "Agent Factory"
+print(text.lower())
+print(text.upper())
+print(text.replace("Factory", "Studio"))
+print(len(text))
+```
+
+**练习 3**: 用切片获取字符串 "Python" 的前两个字符和后三个字符：
+```python
+text = "Python"
+print(text[:2])   # 前两个字符
+print(text[-3:])  # 后三个字符
+```
+
 ### 2.3 布尔值（bool）
 
 ```python
@@ -117,6 +177,24 @@ print(True or False)    # True（或）
 print(not True)         # False（非）
 ```
 
+### 🙋 动动手
+
+现在请你动手试试：
+
+**练习 1**: 创建两个布尔变量，表示你今天是否完成了作业和是否吃了早饭，然后用 `and` 运算符判断"两件事都做了吗"：
+```python
+did_homework = True
+had_breakfast = False
+print(f"两件事都做了: {did_homework and had_breakfast}")
+```
+
+**练习 2**: 猜猜以下代码的输出，然后运行验证：
+```python
+print(5 > 3 and 2 > 4)
+print(5 > 3 or 2 > 4)
+print(not (5 > 3))
+```
+
 ### 2.4 None 类型
 
 ```python
@@ -134,6 +212,10 @@ if result is None:
 # 错误写法: if result == None
 # 正确写法: if result is None
 ```
+
+### 📝 小结（变量和数据类型）
+
+Python 有四种基本数据类型：`int`（整数）、`float`（浮点数）、`str`（字符串）、`bool`（布尔值）。另外还有 `None` 表示"没有值"。Python 是动态类型语言，变量不需要声明类型，直接赋值即可。用 `type()` 可以查看变量类型，用 `is None` 判断空值。
 
 ---
 

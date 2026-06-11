@@ -14,6 +14,16 @@
 
 **虚拟环境**就是解决这些问题的"隔离房间"。每个项目有自己的独立环境，互不干扰。
 
+### 🙋 动动手
+
+在开始之前，先做个小调查：在终端输入以下命令，看看你当前全局环境装了多少包：
+
+```bash
+pip list
+```
+
+你可能会看到一大堆包。这就是为什么我们需要虚拟环境——把这些包隔离到项目里，不污染全局环境。
+
 ---
 
 ## 2. 什么是虚拟环境？
@@ -58,10 +68,13 @@
 python --version
 ```
 
-期望输出：
+你应该看到类似这样的输出：
+
 ```
 Python 3.10.12
 ```
+
+如果显示 Python 3.10 或更高版本，说明 Python 已安装 ✅
 
 > **注意**：如果你看到 `python: command not found`，说明 Python 没有安装或者没有添加到 PATH。请先去 [python.org](https://www.python.org/downloads/) 下载安装 Python 3.10+，安装时务必勾选 **"Add Python to PATH"**。
 
@@ -81,6 +94,8 @@ ls        # Windows PowerShell
 ```
 
 ### 3.3 创建虚拟环境
+
+在终端输入：
 
 ```bash
 # 使用 Python 内置的 venv 模块创建虚拟环境
@@ -119,14 +134,20 @@ agent-factory/
 
 创建虚拟环境后，你需要**激活**它，告诉终端："从现在开始，用这个虚拟环境里的 Python 和 pip"。
 
+根据你的操作系统，在终端输入对应的命令：
+
+**Windows (PowerShell)：**
 ```bash
-# ===== Windows (PowerShell) =====
 venv\Scripts\Activate.ps1
+```
 
-# ===== Windows (CMD) =====
+**Windows (CMD)：**
+```bash
 venv\Scripts\activate.bat
+```
 
-# ===== Mac/Linux =====
+**Mac/Linux：**
+```bash
 source venv/bin/activate
 ```
 
@@ -140,28 +161,45 @@ C:\Users\yourname\agent-factory>
 (venv) C:\Users\yourname\agent-factory>
 ```
 
-> 注意前面多了 `(venv)` 前缀，这说明你现在处于虚拟环境中。**如果看不到这个前缀，说明激活没成功，需要检查命令是否正确。**
+注意前面多了 `(venv)` 前缀，这说明你现在处于虚拟环境中 ✅
+
+**如果看不到这个前缀，说明激活没成功，需要检查命令是否正确。**
 
 ### 3.5 验证虚拟环境
+
+在终端输入以下命令，验证虚拟环境是否正常工作：
 
 ```bash
 # 查看 Python 路径（应该指向 venv 目录）
 which python          # Mac/Linux
 where python          # Windows
+```
 
-# 预期输出类似：
-# /Users/you/agent-factory/venv/bin/python    (Mac/Linux)
-# C:\Users\you\agent-factory\venv\Scripts\python.exe  (Windows)
+你应该看到类似这样的输出（路径中包含 `venv`）：
+```
+# Mac/Linux:
+/Users/you/agent-factory/venv/bin/python
 
-# 查看 Python 版本
+# Windows:
+C:\Users\you\agent-factory\venv\Scripts\python.exe
+```
+
+再查看 Python 版本和已安装的包：
+
+```bash
 python --version
-# 输出：Python 3.10.12
+```
 
-# 查看已安装的包（应该非常干净，只有几个基础包）
+输出应该是：
+```
+Python 3.10.12
+```
+
+```bash
 pip list
 ```
 
-预期 `pip list` 输出：
+预期输出：
 ```
 Package    Version
 ---------- -------
@@ -170,7 +208,7 @@ setuptools 68.0.0
 wheel      0.41.2
 ```
 
-> 只有 3 个包！这就是虚拟环境的"干净"——全局环境可能装了上百个包，但虚拟环境从零开始。
+只有 3 个包！这就是虚拟环境的"干净"——全局环境可能装了上百个包，但虚拟环境从零开始。
 
 ### 3.6 退出虚拟环境
 
@@ -180,12 +218,41 @@ wheel      0.41.2
 deactivate
 ```
 
+退出后，终端提示符会变回原来的样子：
 ```
-# 退出后：
 C:\Users\yourname\agent-factory>    <-- (venv) 前缀消失了
 ```
 
 > **常见错误**：忘记激活虚拟环境就开始 `pip install`，结果包装到了全局。养成习惯：每次打开终端，先激活虚拟环境。
+
+### 🙋 动动手
+
+现在请你动手试试：
+
+**练习 1**: 创建虚拟环境并激活：
+```bash
+python -m venv venv
+venv\Scripts\Activate.ps1    # Windows PowerShell
+```
+
+**练习 2**: 确认虚拟环境已激活（看到 `(venv)` 前缀了吗？），然后验证 Python 路径：
+```bash
+where python    # Windows
+```
+
+**练习 3**: 查看虚拟环境中已安装的包（应该只有 3 个）：
+```bash
+pip list
+```
+
+**练习 4**: 退出虚拟环境：
+```bash
+deactivate
+```
+
+### 📝 小结
+
+虚拟环境是 Python 项目开发的"标准配置"。核心流程：`python -m venv venv`（创建） -> 激活（看到 `(venv)` 前缀） -> 使用 -> `deactivate`（退出）。记住：**每次打开终端，先激活虚拟环境**。
 
 ---
 
